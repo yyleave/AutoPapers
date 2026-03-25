@@ -262,6 +262,44 @@ def test_phase1_dry_run_no_search(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     assert not (tmp_path / "data").exists()
 
 
+def test_phase1_dry_run_aminer_provider_no_search(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    prof = tmp_path / "p.json"
+    prof.write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "user": {"languages": ["en"]},
+                "background": {"domains": [], "skills": [], "constraints": []},
+                "hardware": {"device": "other"},
+                "research_intent": {
+                    "problem_statements": [],
+                    "keywords": ["citation", "network"],
+                    "non_goals": [],
+                    "risk_tolerance": "medium",
+                },
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    r = CliRunner().invoke(
+        app,
+        ["phase1", "run", "--profile", str(prof), "--dry-run", "--limit", "7"],
+        env={"AUTOPAPERS_PROVIDER": "aminer"},
+    )
+    assert r.exit_code == 0
+    out = json.loads(r.stdout)
+    assert out["dry_run"] is True
+    assert out["provider"] == "aminer"
+    assert out["limit"] == 7
+    assert "citation" in out["query"] and "network" in out["query"]
+    assert not (tmp_path / "data").exists()
+
+
 @patch.object(OpenAlexProvider, "search")
 def test_phase1_run_openalex_mocked_writes_search_metadata(
     mock_search: MagicMock,
