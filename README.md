@@ -71,6 +71,9 @@ uv run autopapers version
 # 当前生效的 provider / 日志级别、default.toml 路径、数据根目录等（JSON）
 uv run autopapers config
 
+# 已注册的文献源名称与简介（JSON）
+uv run autopapers providers
+
 # 若当前工作目录不是仓库根目录，可指定仓库根：./data 与 configs/default.toml 均相对该路径
 # export AUTOPAPERS_REPO_ROOT="/path/to/AutoPapers"
 

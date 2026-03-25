@@ -168,6 +168,20 @@ def cmd_config() -> None:
     )
 
 
+@app.command("providers")
+def cmd_providers() -> None:
+    """List registered paper search/fetch providers (names + short description)."""
+
+    reg = ProviderRegistry.default()
+    rows: list[dict[str, str]] = []
+    for name in sorted(reg.providers.keys()):
+        prov = reg.providers[name]
+        doc = (type(prov).__doc__ or "").strip()
+        line = doc.split("\n", 1)[0].strip() if doc else ""
+        rows.append({"name": name, "description": line})
+    typer.echo(json.dumps({"providers": rows}, ensure_ascii=False, indent=2))
+
+
 @profile_app.command("init")
 def profile_init(
     output: Path = typer.Option(
