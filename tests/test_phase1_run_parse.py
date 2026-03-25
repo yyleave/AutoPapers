@@ -9,6 +9,7 @@ from pypdf import PdfWriter
 from typer.testing import CliRunner
 
 from autopapers.cli import app
+from autopapers.providers.arxiv_provider import ArxivProvider
 from autopapers.providers.base import PaperRef
 from autopapers.providers.crossref_provider import CrossrefProvider
 from autopapers.providers.openalex_provider import OpenAlexProvider
@@ -347,6 +348,56 @@ def test_phase1_run_crossref_mocked_writes_search_metadata(
     assert row["provider"] == "crossref"
     assert row["query"] == "doi semantics"
     mock_search.assert_called_once_with(query="doi semantics", limit=4)
+
+
+@patch.object(ArxivProvider, "search")
+def test_phase1_run_arxiv_mocked_writes_search_metadata(
+    mock_search: MagicMock,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    mock_search.return_value = [
+        PaperRef(
+            source="arxiv",
+            id="2501.09999",
+            title="ArXiv mock",
+            pdf_url="https://arxiv.org/pdf/2501.09999.pdf",
+        ),
+    ]
+    prof = tmp_path / "p.json"
+    prof.write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "user": {"languages": ["en"]},
+                "background": {"domains": [], "skills": [], "constraints": []},
+                "hardware": {"device": "other"},
+                "research_intent": {
+                    "problem_statements": [],
+                    "keywords": ["attention", "mechanism"],
+                    "non_goals": [],
+                    "risk_tolerance": "medium",
+                },
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    r = CliRunner().invoke(
+        app,
+        ["phase1", "run", "--profile", str(prof), "--limit", "3"],
+        env={"AUTOPAPERS_PROVIDER": "arxiv"},
+    )
+    assert r.exit_code == 0, r.stdout + r.stderr
+    summary = json.loads(r.stdout)
+    assert summary["count"] == 1
+    meta = Path(summary["metadata_file"])
+    row = json.loads(meta.read_text(encoding="utf-8"))
+    assert row["type"] == "search"
+    assert row["provider"] == "arxiv"
+    assert row["query"] == "attention mechanism"
+    mock_search.assert_called_once_with(query="attention mechanism", limit=3)
 
 
 def test_phase1_parse_fetched_requires_fetch_first(
