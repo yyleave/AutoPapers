@@ -37,6 +37,14 @@ def test_newest_papers_metadata_empty_dir(tmp_path: Path) -> None:
     assert newest_papers_metadata(paths, kind="any") is None
 
 
+def test_newest_papers_metadata_missing_dir(tmp_path: Path) -> None:
+    paths = get_paths(repo_root=tmp_path)
+    # data/ may exist but papers/metadata not created
+    paths.data_dir.mkdir(parents=True)
+    assert not paths.papers_metadata_dir.is_dir()
+    assert newest_papers_metadata(paths, kind="any") is None
+
+
 def test_show_metadata_cli(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from typer.testing import CliRunner
 
