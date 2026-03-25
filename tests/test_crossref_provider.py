@@ -63,6 +63,28 @@ def test_crossref_fetch_pdf_requires_url(tmp_path: Path) -> None:
 
 
 @patch("autopapers.providers.crossref_provider.urllib.request.urlopen")
+def test_crossref_fetch_pdf_writes_response_bytes(
+    mock_urlopen: MagicMock,
+    tmp_path: Path,
+) -> None:
+    ref = PaperRef(
+        source="crossref",
+        id="10.1000/example",
+        title="T",
+        pdf_url="https://publisher.example/full.pdf",
+    )
+    resp = MagicMock()
+    resp.__enter__.return_value.read.return_value = b"%PDF-crossref"
+    resp.__exit__.return_value = None
+    mock_urlopen.return_value = resp
+    dest = tmp_path / "pdfs"
+    out = CrossrefProvider().fetch_pdf(ref=ref, dest_dir=dest)
+    assert out == dest / "10.1000_example.pdf"
+    assert out.read_bytes() == b"%PDF-crossref"
+    mock_urlopen.assert_called_once()
+
+
+@patch("autopapers.providers.crossref_provider.urllib.request.urlopen")
 def test_crossref_search_parses_results(mock_urlopen: MagicMock) -> None:
     body = {
         "message": {

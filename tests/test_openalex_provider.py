@@ -58,6 +58,28 @@ def test_openalex_fetch_pdf_requires_url(tmp_path: Path) -> None:
 
 
 @patch("autopapers.providers.openalex_provider.urllib.request.urlopen")
+def test_openalex_fetch_pdf_writes_response_bytes(
+    mock_urlopen: MagicMock,
+    tmp_path: Path,
+) -> None:
+    ref = PaperRef(
+        source="openalex",
+        id="W999",
+        title="T",
+        pdf_url="https://oa.example/article.pdf",
+    )
+    resp = MagicMock()
+    resp.__enter__.return_value.read.return_value = b"%PDF-openalex"
+    resp.__exit__.return_value = None
+    mock_urlopen.return_value = resp
+    dest = tmp_path / "pdfs"
+    out = OpenAlexProvider().fetch_pdf(ref=ref, dest_dir=dest)
+    assert out == dest / "W999.pdf"
+    assert out.read_bytes() == b"%PDF-openalex"
+    mock_urlopen.assert_called_once()
+
+
+@patch("autopapers.providers.openalex_provider.urllib.request.urlopen")
 def test_openalex_search_parses_results(mock_urlopen: MagicMock) -> None:
     body = {
         "results": [
