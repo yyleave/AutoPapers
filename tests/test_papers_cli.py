@@ -108,6 +108,35 @@ def test_papers_search_arxiv_cli_mocked_writes_search_metadata(
     mock_search.assert_called_once_with(query="attention", limit=1)
 
 
+@patch.object(ArxivProvider, "search")
+def test_papers_search_arxiv_no_save_skips_metadata_write(
+    mock_search: MagicMock,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("AUTOPAPERS_PROVIDER", "arxiv")
+    mock_search.return_value = [
+        PaperRef(
+            source="arxiv",
+            id="2501.00099",
+            title="No save",
+            pdf_url="https://arxiv.org/pdf/2501.00099.pdf",
+        ),
+    ]
+    r = CliRunner().invoke(
+        app,
+        ["papers", "search", "-q", "test", "--limit", "1", "--no-save"],
+    )
+    assert r.exit_code == 0
+    rows = json.loads(r.stdout.strip())
+    assert len(rows) == 1
+    assert "Wrote metadata" not in (r.stderr or "")
+    meta_dir = tmp_path / "data" / "papers" / "metadata"
+    assert (not meta_dir.is_dir()) or not list(meta_dir.glob("search-*.json"))
+    mock_search.assert_called_once_with(query="test", limit=1)
+
+
 def test_show_metadata_latest_empty_dir_exits(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
