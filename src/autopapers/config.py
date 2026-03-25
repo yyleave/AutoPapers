@@ -24,14 +24,25 @@ class Paths:
     kg_dir: Path
 
 
+def _resolve_data_repo_root(explicit: Path | None) -> Path:
+    if explicit is not None:
+        return explicit.expanduser().resolve()
+    env = os.environ.get("AUTOPAPERS_REPO_ROOT", "").strip()
+    if env:
+        return Path(env).expanduser().resolve()
+    return Path.cwd().resolve()
+
+
 def get_paths(*, repo_root: Path | None = None) -> Paths:
     """
     Resolve project paths.
 
-    Data is intentionally kept under ./data by default and should be gitignored.
+    Data lives under ``<root>/data`` where ``root`` is: explicit ``repo_root`` argument, else
+    ``AUTOPAPERS_REPO_ROOT`` if set, else current working directory. This path should be
+    gitignored.
     """
 
-    root = (repo_root or Path.cwd()).resolve()
+    root = _resolve_data_repo_root(repo_root)
     data_dir = (root / "data").resolve()
     cache_dir = data_dir / "cache"
     runs_dir = data_dir / "runs"

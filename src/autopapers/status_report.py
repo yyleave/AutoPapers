@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +34,7 @@ def build_status(
 
     return {
         "app_version": __version__,
+        "autopapers_repo_root_env_set": bool(os.environ.get("AUTOPAPERS_REPO_ROOT", "").strip()),
         "config": {
             "provider": c.provider,
             "log_level": c.log_level,

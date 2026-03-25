@@ -65,6 +65,12 @@ uv sync
 # 环境与数据目录概览（配置、已注册 provider、metadata/pdf 数量等）
 uv run autopapers status
 
+# 版本号（与 pyproject 版本一致，需可编辑/安装包）
+uv run autopapers version
+
+# 若当前工作目录不是仓库根目录，可指定数据根路径（./data 落在该目录下）
+# export AUTOPAPERS_REPO_ROOT="/path/to/AutoPapers"
+
 # Phase 1：用户画像
 uv run autopapers profile init -o user_profile.json
 uv run autopapers profile validate -i user_profile.json

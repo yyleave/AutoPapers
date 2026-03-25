@@ -6,6 +6,7 @@ from pathlib import Path
 
 import typer
 
+from autopapers import __version__ as autopapers_version
 from autopapers.config import get_paths, load_config
 from autopapers.logging_utils import setup_logging
 from autopapers.phase1.corpus_snapshot import build_corpus_snapshot, write_corpus_snapshot
@@ -70,6 +71,13 @@ def cmd_status() -> None:
     """
 
     typer.echo(json.dumps(build_status(), ensure_ascii=False, indent=2))
+
+
+@app.command("version")
+def cmd_version() -> None:
+    """Print package version."""
+
+    typer.echo(autopapers_version)
 
 
 @profile_app.command("init")
