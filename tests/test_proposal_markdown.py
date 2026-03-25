@@ -40,6 +40,16 @@ def test_proposal_to_markdown_skips_non_dict_debate_notes() -> None:
     assert "## Debate notes" not in md
 
 
+def test_proposal_to_markdown_empty_debate_notes_dict_skips_section() -> None:
+    md = proposal_to_markdown({"title": "T", "debate_notes": {}})
+    assert "## Debate notes" not in md
+
+
+def test_proposal_to_markdown_default_title_when_missing() -> None:
+    md = proposal_to_markdown({})
+    assert md.startswith("# Research proposal\n")
+
+
 def test_proposal_to_markdown_includes_sections() -> None:
     debate = run_debate_stub(profile_summary="{}", corpus_summary="{}")
     prop = merge_stub_to_proposal(title="My study", debate=debate, status="draft")
