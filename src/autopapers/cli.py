@@ -10,6 +10,7 @@ import typer
 from autopapers import __version__ as autopapers_version
 from autopapers.config import get_paths, load_config
 from autopapers.logging_utils import setup_logging
+from autopapers.phase1.corpus_inspect import summarize_corpus_snapshot
 from autopapers.phase1.corpus_snapshot import build_corpus_snapshot, write_corpus_snapshot
 from autopapers.phase1.papers.parse_pdf import extract_and_save_txt
 from autopapers.phase1.papers.storage import (
@@ -469,6 +470,52 @@ def corpus_build(
     snap = build_corpus_snapshot(paths, profile_path=profile)
     out = write_corpus_snapshot(paths, snap)
     typer.echo(str(out))
+
+
+@corpus_app.command("info")
+def corpus_info(
+    snapshot: Path | None = typer.Option(
+        None,
+        "--snapshot",
+        "-s",
+        exists=True,
+        dir_okay=False,
+        help="Snapshot JSON (default: data/kg/corpus-snapshot.json)",
+    ),
+) -> None:
+    """Print node/edge summaries for an existing corpus snapshot (no rebuild)."""
+
+    paths = get_paths()
+    path = snapshot or (paths.kg_dir / "corpus-snapshot.json")
+    if not path.is_file():
+        typer.echo(
+            json.dumps(
+                {"error": "snapshot_not_found", "path": str(path.resolve())},
+                indent=2,
+            ),
+            err=True,
+        )
+        raise typer.Exit(code=1)
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        typer.echo(
+            json.dumps(
+                {"error": "invalid_json", "path": str(path.resolve()), "detail": str(e)},
+                indent=2,
+            ),
+            err=True,
+        )
+        raise typer.Exit(code=1) from e
+    if not isinstance(data, dict):
+        typer.echo(
+            json.dumps({"error": "expected_object", "path": str(path.resolve())}, indent=2),
+            err=True,
+        )
+        raise typer.Exit(code=1)
+    summary = summarize_corpus_snapshot(data)
+    summary["snapshot"] = str(path.resolve())
+    typer.echo(json.dumps(summary, ensure_ascii=False, indent=2))
 
 
 @proposal_app.command("draft")

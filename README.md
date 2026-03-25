@@ -96,6 +96,8 @@ uv run autopapers papers parse-batch --input-dir ./data/papers/pdfs --write-mani
 uv run autopapers corpus build
 # 可选：把用户画像里的关键词并入图中
 uv run autopapers corpus build --profile user_profile.json
+# 查看当前快照的节点类型 / 边类型统计（不重新 build）
+uv run autopapers corpus info
 
 # Phase 2 占位：生成/确认 proposal（未指定 --corpus 时会自动用 data/kg/corpus-snapshot.json）
 uv run autopapers proposal draft --profile user_profile.json
