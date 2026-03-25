@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from autopapers.config import AppConfig, get_paths
@@ -23,6 +24,27 @@ def test_build_status_counts(tmp_path: Path) -> None:
     assert "crossref" in r["providers"]
     assert "default_toml_path" in r["config"]
     assert "default_toml_present" in r["config"]
+    assert r["corpus_snapshot"]["present"] is False
+    assert r["corpus_snapshot"]["summary"] is None
+
+
+def test_build_status_includes_corpus_summary_when_present(tmp_path: Path) -> None:
+    paths = get_paths(repo_root=tmp_path)
+    paths.kg_dir.mkdir(parents=True)
+    (paths.kg_dir / "corpus-snapshot.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "nodes": [{"id": "1", "type": "Paper"}],
+                "edges": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    r = build_status(paths=paths)
+    assert r["corpus_snapshot"]["present"] is True
+    assert r["corpus_snapshot"]["summary"] is not None
+    assert r["corpus_snapshot"]["summary"]["node_total"] == 1
 
 
 def test_build_status_proposal_flags(tmp_path: Path) -> None:

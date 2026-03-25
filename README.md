@@ -62,7 +62,7 @@ cd AutoPapers
 
 uv sync
 
-# 环境与数据目录概览（配置、已注册 provider、metadata/pdf 数量等）
+# 环境与数据目录概览（配置、provider、metadata 数量；若存在语料快照则含节点/边统计）
 uv run autopapers status
 
 # 版本号（与 pyproject 版本一致，需可编辑/安装包）

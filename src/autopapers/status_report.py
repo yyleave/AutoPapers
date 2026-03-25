@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 from typing import Any
 
 from autopapers import __version__
 from autopapers.config import AppConfig, Paths, default_toml_path, get_paths, load_config
+from autopapers.phase1.corpus_inspect import (
+    load_corpus_snapshot_document,
+    summarize_corpus_snapshot,
+)
 from autopapers.providers.polite_ua import polite_mailto
 from autopapers.providers.registry import ProviderRegistry
 
@@ -34,6 +39,18 @@ def build_status(
     confirmed = p.proposals_dir / "proposal-confirmed.json"
     cfg_toml = default_toml_path()
 
+    corpus_snapshot: dict[str, Any] = {
+        "path": str(snap.resolve()),
+        "present": snap.is_file(),
+        "summary": None,
+    }
+    if snap.is_file():
+        try:
+            doc = load_corpus_snapshot_document(snap)
+            corpus_snapshot["summary"] = summarize_corpus_snapshot(doc)
+        except (OSError, json.JSONDecodeError, TypeError):
+            corpus_snapshot["load_error"] = True
+
     return {
         "app_version": __version__,
         "autopapers_repo_root_env_set": bool(os.environ.get("AUTOPAPERS_REPO_ROOT", "").strip()),
@@ -55,6 +72,7 @@ def build_status(
             "profiles_dir": str(p.profiles_dir),
         },
         "providers": sorted(reg.providers.keys()),
+        "corpus_snapshot": corpus_snapshot,
         "data": {
             "metadata_json": _safe_glob_count(p.papers_metadata_dir, "*.json"),
             "pdfs": _safe_glob_count(p.papers_pdfs_dir, "*.pdf"),
