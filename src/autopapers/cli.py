@@ -8,6 +8,7 @@ import typer
 
 from autopapers.config import get_paths, load_config
 from autopapers.logging_utils import setup_logging
+from autopapers.phase1.corpus_snapshot import build_corpus_snapshot, write_corpus_snapshot
 from autopapers.phase1.papers.parse_pdf import extract_pdf_text
 from autopapers.phase1.papers.storage import write_fetch_record, write_search_record
 from autopapers.phase1.profile.extract import load_profile_from_json
@@ -29,6 +30,9 @@ app.add_typer(phase1_app, name="phase1")
 
 proposal_app = typer.Typer(help="Phase 2: proposal draft / confirm (stub debate)")
 app.add_typer(proposal_app, name="proposal")
+
+corpus_app = typer.Typer(help="Phase 1: corpus / KG snapshot from metadata")
+app.add_typer(corpus_app, name="corpus")
 
 
 @app.callback()
@@ -267,6 +271,27 @@ def phase1_run(
             pdf_path=pdf_path,
         )
         typer.echo(json.dumps({"pdf": str(pdf_path), "fetch_metadata": str(fmeta)}, indent=2))
+
+
+@corpus_app.command("build")
+def corpus_build(
+    profile: Path | None = typer.Option(
+        None,
+        "--profile",
+        "-p",
+        exists=True,
+        dir_okay=False,
+        help="Optional profile JSON to add User/Keyword nodes",
+    ),
+) -> None:
+    """
+    Build data/kg/corpus-snapshot.json from data/papers/metadata/*.json.
+    """
+
+    paths = get_paths()
+    snap = build_corpus_snapshot(paths, profile_path=profile)
+    out = write_corpus_snapshot(paths, snap)
+    typer.echo(str(out))
 
 
 @proposal_app.command("draft")

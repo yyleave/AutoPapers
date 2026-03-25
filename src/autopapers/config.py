@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import os
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
+
+from autopapers.repo_paths import repo_root
 
 
 @dataclass(frozen=True)
@@ -18,6 +21,7 @@ class Paths:
     papers_pdfs_dir: Path
     papers_parsed_dir: Path
     proposals_dir: Path
+    kg_dir: Path
 
 
 def get_paths(*, repo_root: Path | None = None) -> Paths:
@@ -38,6 +42,7 @@ def get_paths(*, repo_root: Path | None = None) -> Paths:
     papers_pdfs_dir = papers_dir / "pdfs"
     papers_parsed_dir = papers_dir / "parsed"
     proposals_dir = data_dir / "proposals"
+    kg_dir = data_dir / "kg"
     return Paths(
         repo_root=root,
         data_dir=data_dir,
@@ -50,6 +55,7 @@ def get_paths(*, repo_root: Path | None = None) -> Paths:
         papers_pdfs_dir=papers_pdfs_dir,
         papers_parsed_dir=papers_parsed_dir,
         proposals_dir=proposals_dir,
+        kg_dir=kg_dir,
     )
 
 
@@ -60,9 +66,21 @@ class AppConfig:
 
 
 def load_config() -> AppConfig:
-    # MVP: env-only config. Can be extended to read configs/default.toml later.
+    """
+    Load defaults from configs/default.toml when present; environment overrides.
+    """
+    log_level = "INFO"
+    provider = "arxiv"
+
+    cfg_path = repo_root() / "configs" / "default.toml"
+    if cfg_path.is_file():
+        data = tomllib.loads(cfg_path.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            log_level = str(data.get("log_level", log_level))
+            provider = str(data.get("provider", provider))
+
     return AppConfig(
-        log_level=os.environ.get("AUTOPAPERS_LOG_LEVEL", "INFO"),
-        provider=os.environ.get("AUTOPAPERS_PROVIDER", "arxiv"),
+        log_level=os.environ.get("AUTOPAPERS_LOG_LEVEL", log_level),
+        provider=os.environ.get("AUTOPAPERS_PROVIDER", provider),
     )
 
