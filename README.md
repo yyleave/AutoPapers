@@ -68,7 +68,7 @@ uv run autopapers status
 # 版本号（与 pyproject 版本一致，需可编辑/安装包）
 uv run autopapers version
 
-# 若当前工作目录不是仓库根目录，可指定数据根路径（./data 落在该目录下）
+# 若当前工作目录不是仓库根目录，可指定仓库根：./data 与 configs/default.toml 均相对该路径
 # export AUTOPAPERS_REPO_ROOT="/path/to/AutoPapers"
 
 # Phase 1：用户画像
@@ -79,6 +79,9 @@ uv run autopapers profile validate -i user_profile.json
 # 建议在 User-Agent 中带邮箱（各 API polite use）：export OPENALEX_MAILTO='you@example.com'
 # Crossref 亦可：export CROSSREF_MAILTO='you@example.com'
 uv run autopapers papers search -q "transformer" -l 3
+
+# 列出已写入的检索/抓取元数据 JSON（按修改时间倒序）
+uv run autopapers papers list-metadata
 
 # Phase 1 一键：profile → 搜索 →（可选）拉取首篇 PDF →（可选）转文本 + manifest
 uv run autopapers phase1 run --profile user_profile.json --fetch-first --parse-fetched

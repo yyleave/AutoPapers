@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from autopapers import __version__
-from autopapers.config import AppConfig, Paths, get_paths, load_config
+from autopapers.config import AppConfig, Paths, default_toml_path, get_paths, load_config
 from autopapers.providers.registry import ProviderRegistry
 
 
@@ -31,6 +31,7 @@ def build_status(
     snap = p.kg_dir / "corpus-snapshot.json"
     draft = p.proposals_dir / "proposal-draft.json"
     confirmed = p.proposals_dir / "proposal-confirmed.json"
+    cfg_toml = default_toml_path()
 
     return {
         "app_version": __version__,
@@ -38,6 +39,8 @@ def build_status(
         "config": {
             "provider": c.provider,
             "log_level": c.log_level,
+            "default_toml_path": str(cfg_toml),
+            "default_toml_present": cfg_toml.is_file(),
         },
         "paths": {
             "repo_root": str(p.repo_root),

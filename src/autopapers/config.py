@@ -76,14 +76,28 @@ class AppConfig:
     provider: str = "arxiv"
 
 
+def default_toml_path() -> Path:
+    """
+    Path to ``configs/default.toml``: under ``AUTOPAPERS_REPO_ROOT`` if set, else package repo root.
+    """
+
+    env = os.environ.get("AUTOPAPERS_REPO_ROOT", "").strip()
+    if env:
+        return Path(env).expanduser().resolve() / "configs" / "default.toml"
+    return repo_root() / "configs" / "default.toml"
+
+
 def load_config() -> AppConfig:
     """
     Load defaults from configs/default.toml when present; environment overrides.
+
+    When ``AUTOPAPERS_REPO_ROOT`` is set (same root as ``get_paths()`` data layout),
+    ``<root>/configs/default.toml`` is used so project config travels with that checkout.
     """
     log_level = "INFO"
     provider = "arxiv"
 
-    cfg_path = repo_root() / "configs" / "default.toml"
+    cfg_path = default_toml_path()
     if cfg_path.is_file():
         data = tomllib.loads(cfg_path.read_text(encoding="utf-8"))
         if isinstance(data, dict):

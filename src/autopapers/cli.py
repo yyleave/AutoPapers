@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import UTC, datetime
 from pathlib import Path
 
 import typer
@@ -184,6 +185,37 @@ def papers_search(
             paths, provider=provider_name, query=query, refs=refs
         )
         typer.echo(f"Wrote metadata: {meta_path}", err=True)
+
+
+@papers_app.command("list-metadata")
+def papers_list_metadata(
+    limit: int = typer.Option(30, "--limit", "-l", help="Max files (newest first)"),
+) -> None:
+    """List JSON metadata files under data/papers/metadata/."""
+
+    paths = get_paths()
+    d = paths.papers_metadata_dir
+    if not d.is_dir():
+        typer.echo(
+            json.dumps({"metadata_dir": str(d), "files": []}, ensure_ascii=False, indent=2)
+        )
+        return
+    files = sorted(d.glob("*.json"), key=lambda x: x.stat().st_mtime, reverse=True)[
+        :limit
+    ]
+    rows: list[dict[str, object]] = []
+    for f in files:
+        st = f.stat()
+        rows.append(
+            {
+                "name": f.name,
+                "path": str(f.resolve()),
+                "mtime_iso": datetime.fromtimestamp(st.st_mtime, tz=UTC).isoformat(),
+            }
+        )
+    typer.echo(
+        json.dumps({"metadata_dir": str(d), "files": rows}, ensure_ascii=False, indent=2)
+    )
 
 
 @papers_app.command("fetch")

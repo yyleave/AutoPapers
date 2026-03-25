@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from autopapers.config import _resolve_data_repo_root, get_paths
+from autopapers.config import _resolve_data_repo_root, get_paths, load_config
 
 
 def test_get_paths_uses_autopapers_repo_root_env(
@@ -31,3 +31,21 @@ def test_resolve_data_repo_root_explicit_wins(
     explicit = tmp_path / "explicit"
     explicit.mkdir()
     assert _resolve_data_repo_root(explicit) == explicit.resolve()
+
+
+def test_load_config_reads_toml_under_autopapers_repo_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg_dir = tmp_path / "configs"
+    cfg_dir.mkdir(parents=True)
+    (cfg_dir / "default.toml").write_text(
+        'provider = "openalex"\nlog_level = "WARNING"\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("AUTOPAPERS_REPO_ROOT", str(tmp_path))
+    monkeypatch.delenv("AUTOPAPERS_PROVIDER", raising=False)
+    monkeypatch.delenv("AUTOPAPERS_LOG_LEVEL", raising=False)
+    c = load_config()
+    assert c.provider == "openalex"
+    assert c.log_level == "WARNING"

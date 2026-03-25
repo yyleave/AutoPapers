@@ -20,6 +20,8 @@ def test_build_status_counts(tmp_path: Path) -> None:
     assert r["data"]["metadata_json"] == 1
     assert r["data"]["profiles_json"] == 1
     assert "crossref" in r["providers"]
+    assert "default_toml_path" in r["config"]
+    assert "default_toml_present" in r["config"]
 
 
 def test_build_status_proposal_flags(tmp_path: Path) -> None:
