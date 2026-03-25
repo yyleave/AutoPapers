@@ -37,6 +37,29 @@ def test_write_fetch_record(tmp_path: Path) -> None:
     assert data["type"] == "fetch"
 
 
+def test_write_search_record_serializes_object_with_dict(tmp_path: Path) -> None:
+    class LooseRef:
+        def __init__(self) -> None:
+            self.source = "arxiv"
+            self.id = "9999.9999"
+            self.title = "Loose"
+            self.pdf_url = "https://example/x.pdf"
+
+    paths = get_paths(repo_root=tmp_path)
+    p = write_search_record(paths, provider="arxiv", query="q", refs=[LooseRef()])
+    data = json.loads(p.read_text(encoding="utf-8"))
+    assert data["results"][0]["id"] == "9999.9999"
+    assert data["results"][0]["title"] == "Loose"
+
+
+def test_write_search_record_serializes_plain_value_as_repr(tmp_path: Path) -> None:
+    paths = get_paths(repo_root=tmp_path)
+    p = write_search_record(paths, provider="arxiv", query="q", refs=[7, "x"])
+    rows = json.loads(p.read_text(encoding="utf-8"))["results"]
+    assert rows[0]["value"] == "7"
+    assert rows[1]["value"] == "'x'"
+
+
 def test_write_parse_manifest(tmp_path: Path) -> None:
     pdf = tmp_path / "doc.pdf"
     pdf.write_bytes(b"%PDF")
