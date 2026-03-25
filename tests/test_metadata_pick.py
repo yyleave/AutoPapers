@@ -129,3 +129,25 @@ def test_show_metadata_cli_latest_any_picks_newest_mtime(
     assert r.exit_code == 0
     out = json.loads(r.stdout)
     assert out["data"]["marker"] == "fetch-side"
+
+
+def test_show_metadata_cli_explicit_path_ok(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from typer.testing import CliRunner
+
+    from autopapers.cli import app
+
+    monkeypatch.chdir(tmp_path)
+    f = tmp_path / "custom-search-meta.json"
+    f.write_text(
+        json.dumps({"type": "search", "query": "explicit-path"}),
+        encoding="utf-8",
+    )
+
+    r = CliRunner().invoke(app, ["papers", "show-metadata", "--path", str(f)])
+    assert r.exit_code == 0
+    out = json.loads(r.stdout)
+    assert out["file"] == str(f.resolve())
+    assert out["data"]["query"] == "explicit-path"

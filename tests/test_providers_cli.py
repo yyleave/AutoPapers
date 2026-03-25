@@ -13,8 +13,8 @@ def test_providers_command_lists_all() -> None:
     assert r.exit_code == 0
     data = json.loads(r.stdout)
     names = {p["name"] for p in data["providers"]}
-    assert "arxiv" in names
-    assert "openalex" in names
-    assert "crossref" in names
+    assert names == {"aminer", "arxiv", "crossref", "local_pdf", "openalex"}
     for p in data["providers"]:
         assert "description" in p
+        assert isinstance(p["description"], str)
+        assert p["description"].strip() != ""
