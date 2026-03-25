@@ -15,6 +15,16 @@ from autopapers.providers.crossref_provider import CrossrefProvider
 from autopapers.providers.openalex_provider import OpenAlexProvider
 
 
+def _two_json_objects(stdout: str) -> tuple[dict, dict]:
+    dec = json.JSONDecoder()
+    s = stdout.strip()
+    o1, i = dec.raw_decode(s)
+    while i < len(s) and s[i].isspace():
+        i += 1
+    o2, _ = dec.raw_decode(s, i)
+    return o1, o2
+
+
 def _minimal_profile(path: Path, *, pdf_abs: str) -> None:
     doc = {
         "schema_version": "0.1",
@@ -448,6 +458,73 @@ def test_phase1_run_uses_problem_statement_when_keywords_empty(
     row = json.loads(meta.read_text(encoding="utf-8"))
     assert row["query"] == query_text
     mock_search.assert_called_once_with(query=query_text, limit=5)
+
+
+@patch.object(ArxivProvider, "fetch_pdf")
+@patch.object(ArxivProvider, "search")
+def test_phase1_run_fetch_first_arxiv_mocked_writes_search_and_fetch(
+    mock_search: MagicMock,
+    mock_fetch: MagicMock,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    mock_search.return_value = [
+        PaperRef(
+            source="arxiv",
+            id="2501.08888",
+            title="Fetch mock",
+            pdf_url="https://arxiv.org/pdf/2501.08888.pdf",
+        ),
+    ]
+    out_pdf = tmp_path / "data" / "papers" / "pdfs" / "2501.08888.pdf"
+    out_pdf.parent.mkdir(parents=True, exist_ok=True)
+    out_pdf.write_bytes(b"%PDF-phase1")
+    mock_fetch.return_value = out_pdf
+
+    prof = tmp_path / "p.json"
+    prof.write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "user": {"languages": ["en"]},
+                "background": {"domains": [], "skills": [], "constraints": []},
+                "hardware": {"device": "other"},
+                "research_intent": {
+                    "problem_statements": [],
+                    "keywords": ["gnn"],
+                    "non_goals": [],
+                    "risk_tolerance": "medium",
+                },
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    r = CliRunner().invoke(
+        app,
+        [
+            "phase1",
+            "run",
+            "--profile",
+            str(prof),
+            "--limit",
+            "1",
+            "--fetch-first",
+        ],
+        env={"AUTOPAPERS_PROVIDER": "arxiv"},
+    )
+    assert r.exit_code == 0, r.stdout + r.stderr
+    summary, fetch_payload = _two_json_objects(r.stdout)
+    assert summary["count"] == 1
+    assert Path(summary["metadata_file"]).is_file()
+    assert Path(fetch_payload["pdf"]).resolve() == out_pdf.resolve()
+    assert Path(fetch_payload["fetch_metadata"]).is_file()
+    fetch_row = json.loads(Path(fetch_payload["fetch_metadata"]).read_text(encoding="utf-8"))
+    assert fetch_row["type"] == "fetch"
+    assert fetch_row["id"] == "2501.08888"
+    mock_search.assert_called_once_with(query="gnn", limit=1)
+    mock_fetch.assert_called_once()
 
 
 def test_phase1_parse_fetched_requires_fetch_first(
