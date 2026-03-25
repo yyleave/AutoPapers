@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from autopapers import __version__
 from autopapers.config import AppConfig, Paths, get_paths, load_config
 from autopapers.providers.registry import ProviderRegistry
 
@@ -31,6 +32,7 @@ def build_status(
     confirmed = p.proposals_dir / "proposal-confirmed.json"
 
     return {
+        "app_version": __version__,
         "config": {
             "provider": c.provider,
             "log_level": c.log_level,

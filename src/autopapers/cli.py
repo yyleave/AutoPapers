@@ -20,6 +20,7 @@ from autopapers.phase1.profile.store import save_profile
 from autopapers.phase1.profile.validate import load_schema, validate_profile
 from autopapers.phase2.corpus_input import load_corpus_text_for_proposal
 from autopapers.phase2.debate import merge_stub_to_proposal, run_debate_stub
+from autopapers.phase2.proposal_markdown import proposal_to_markdown
 from autopapers.providers.base import PaperRef
 from autopapers.providers.registry import ProviderRegistry
 from autopapers.status_report import build_status
@@ -478,4 +479,34 @@ def proposal_confirm(
     paths.proposals_dir.mkdir(parents=True, exist_ok=True)
     out = paths.proposals_dir / "proposal-confirmed.json"
     out.write_text(json.dumps(raw, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    typer.echo(str(out))
+
+
+@proposal_app.command("export")
+def proposal_export(
+    input: Path = typer.Option(
+        ...,
+        "--input",
+        "-i",
+        exists=True,
+        dir_okay=False,
+        help="Proposal JSON (draft or confirmed)",
+    ),
+    output: Path | None = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Markdown path (default: same stem as input with .md)",
+    ),
+) -> None:
+    """
+    Validate proposal JSON and write a readable Markdown summary (for notes / sharing).
+    """
+
+    raw = json.loads(input.read_text(encoding="utf-8"))
+    prop_schema = load_schema(_proposal_schema_path())
+    validate_profile(profile=raw, schema=prop_schema)
+    md = proposal_to_markdown(raw)
+    out = output or input.with_suffix(".md")
+    out.write_text(md, encoding="utf-8")
     typer.echo(str(out))
