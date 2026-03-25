@@ -914,11 +914,26 @@ def proposal_confirm(
     Validate proposal schema and mark status confirmed; writes proposal-confirmed.json.
     """
 
-    raw = json.loads(input.read_text(encoding="utf-8"))
+    try:
+        raw = json.loads(input.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        typer.echo(
+            json.dumps({"ok": False, "error": "invalid_json", "detail": str(e)}),
+            err=True,
+        )
+        raise typer.Exit(code=1) from e
+
     prop_schema = load_schema(_proposal_schema_path())
-    validate_profile(profile=raw, schema=prop_schema)
-    raw["status"] = "confirmed"
-    validate_profile(profile=raw, schema=prop_schema)
+    try:
+        validate_profile(profile=raw, schema=prop_schema)
+        raw["status"] = "confirmed"
+        validate_profile(profile=raw, schema=prop_schema)
+    except ValueError as e:
+        typer.echo(
+            json.dumps({"ok": False, "error": "validation", "detail": str(e)}, indent=2),
+            err=True,
+        )
+        raise typer.Exit(code=1) from e
 
     paths = get_paths()
     paths.proposals_dir.mkdir(parents=True, exist_ok=True)

@@ -180,6 +180,38 @@ def test_proposal_export_default_writes_beside_json(
     assert r.stdout.strip() == str(md.resolve())
 
 
+def test_proposal_confirm_cli_rejects_invalid_json(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    bad = tmp_path / "broken-draft.json"
+    bad.write_text("{", encoding="utf-8")
+    out = tmp_path / "would-write.json"
+    r = CliRunner().invoke(app, ["proposal", "confirm", "-i", str(bad), "-o", str(out)])
+    assert r.exit_code == 1
+    err = json.loads(r.stderr.strip())
+    assert err["ok"] is False
+    assert err["error"] == "invalid_json"
+    assert not out.is_file()
+
+
+def test_proposal_confirm_cli_rejects_schema_invalid_doc(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    shallow = tmp_path / "not-a-proposal.json"
+    shallow.write_text("{}", encoding="utf-8")
+    out = tmp_path / "confirmed-absent.json"
+    r = CliRunner().invoke(app, ["proposal", "confirm", "-i", str(shallow), "-o", str(out)])
+    assert r.exit_code == 1
+    err = json.loads(r.stderr.strip())
+    assert err["ok"] is False
+    assert err["error"] == "validation"
+    assert not out.is_file()
+
+
 def test_proposal_confirm_custom_output_path(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
