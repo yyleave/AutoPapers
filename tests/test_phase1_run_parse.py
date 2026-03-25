@@ -13,6 +13,7 @@ from autopapers.providers.arxiv_provider import ArxivProvider
 from autopapers.providers.base import PaperRef
 from autopapers.providers.crossref_provider import CrossrefProvider
 from autopapers.providers.openalex_provider import OpenAlexProvider
+from autopapers.repo_paths import ensure_legacy_api_on_path
 
 
 def _two_json_objects(stdout: str) -> tuple[dict, dict]:
@@ -408,6 +409,63 @@ def test_phase1_run_arxiv_mocked_writes_search_metadata(
     assert row["provider"] == "arxiv"
     assert row["query"] == "attention mechanism"
     mock_search.assert_called_once_with(query="attention mechanism", limit=3)
+
+
+@patch("api.aminer_client.AMinerClient")
+def test_phase1_run_aminer_mocked_writes_search_metadata(
+    mock_client_cls: MagicMock,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ensure_legacy_api_on_path()
+    from api.aminer_client import Paper
+
+    monkeypatch.chdir(tmp_path)
+    mock_inst = MagicMock()
+    mock_client_cls.return_value = mock_inst
+    p = Paper(
+        id="phase1-aminer-1",
+        title="Phase1 AM",
+        authors=["B"],
+        pdf_url="https://x/p.pdf",
+    )
+    mock_inst.paper_search.return_value = [p]
+    mock_inst.paper_info.return_value = [p]
+
+    prof = tmp_path / "p.json"
+    prof.write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "user": {"languages": ["en"]},
+                "background": {"domains": [], "skills": [], "constraints": []},
+                "hardware": {"device": "other"},
+                "research_intent": {
+                    "problem_statements": [],
+                    "keywords": ["knowledge", "graph"],
+                    "non_goals": [],
+                    "risk_tolerance": "medium",
+                },
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    r = CliRunner().invoke(
+        app,
+        ["phase1", "run", "--profile", str(prof), "--limit", "2"],
+        env={"AUTOPAPERS_PROVIDER": "aminer"},
+    )
+    assert r.exit_code == 0, r.stdout + r.stderr
+    summary = json.loads(r.stdout)
+    assert summary["count"] == 1
+    meta = Path(summary["metadata_file"])
+    row = json.loads(meta.read_text(encoding="utf-8"))
+    assert row["type"] == "search"
+    assert row["provider"] == "aminer"
+    assert row["query"] == "knowledge graph"
+    mock_inst.paper_search.assert_called_once_with("knowledge graph", page=0, size=2)
+    mock_inst.paper_info.assert_called_once_with(["phase1-aminer-1"])
 
 
 @patch.object(OpenAlexProvider, "search")
