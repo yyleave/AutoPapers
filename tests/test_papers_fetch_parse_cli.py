@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 from pypdf import PdfWriter
 from typer.testing import CliRunner
 
 from autopapers.cli import app
+from autopapers.providers.arxiv_provider import ArxivProvider
 
 
 def _tiny_pdf(path: Path) -> None:
@@ -71,6 +73,57 @@ def test_papers_fetch_local_pdf_copies_to_pdfs_dir(
     meta = json.loads(meta_files[0].read_text(encoding="utf-8"))
     assert meta["type"] == "fetch"
     assert meta["id"] == "source"
+
+
+@patch.object(ArxivProvider, "fetch_pdf")
+def test_papers_fetch_arxiv_cli_mocked_writes_fetch_metadata(
+    mock_fetch: MagicMock,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    out_pdf = tmp_path / "data" / "papers" / "pdfs" / "2501.00001.pdf"
+    out_pdf.parent.mkdir(parents=True, exist_ok=True)
+    out_pdf.write_bytes(b"%PDF-mock")
+    mock_fetch.return_value = out_pdf
+
+    r = CliRunner().invoke(
+        app,
+        [
+            "papers",
+            "fetch",
+            "--source",
+            "arxiv",
+            "--id",
+            "2501.00001",
+            "--title",
+            "Mock title",
+            "--pdf-url",
+            "https://arxiv.org/pdf/2501.00001.pdf",
+        ],
+    )
+    assert r.exit_code == 0
+    first_line = r.stdout.strip().split("\n", 1)[0]
+    assert first_line == str(out_pdf.resolve())
+    assert "Wrote metadata" in (r.stderr or "")
+    metas = list((tmp_path / "data" / "papers" / "metadata").glob("fetch-*.json"))
+    assert len(metas) == 1
+    doc = json.loads(metas[0].read_text(encoding="utf-8"))
+    assert doc["type"] == "fetch"
+    assert doc["id"] == "2501.00001"
+    mock_fetch.assert_called_once()
+
+
+def test_papers_fetch_unknown_source_exits_nonzero(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    r = CliRunner().invoke(
+        app,
+        ["papers", "fetch", "--source", "not_a_provider", "--id", "x"],
+    )
+    assert r.exit_code != 0
 
 
 def test_papers_parse_custom_output_path(
