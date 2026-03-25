@@ -22,6 +22,7 @@ from autopapers.phase1.papers.storage import (
 )
 from autopapers.phase1.profile.extract import load_profile_from_json
 from autopapers.phase1.profile.store import save_profile
+from autopapers.phase1.profile.summary import compact_profile_view
 from autopapers.phase1.profile.validate import load_schema, validate_profile
 from autopapers.phase2.corpus_input import load_corpus_text_for_proposal
 from autopapers.phase2.debate import merge_stub_to_proposal, run_debate_stub
@@ -161,6 +162,29 @@ def profile_save(
     validate_profile(profile=profile, schema=schema_obj)
     out = save_profile(profile=profile)
     typer.echo(f"Saved: {out}")
+
+
+@profile_app.command("show")
+def profile_show(
+    input: Path = typer.Option(
+        ...,
+        "--input",
+        "-i",
+        exists=True,
+        dir_okay=False,
+        help="Profile JSON",
+    ),
+    schema: Path | None = typer.Option(None, "--schema", help="Override schema path"),
+) -> None:
+    """Validate profile and print a compact summary (keywords, intent, hardware)."""
+
+    schema_path = schema or _schema_path()
+    profile = load_profile_from_json(input)
+    schema_obj = load_schema(schema_path)
+    validate_profile(profile=profile, schema=schema_obj)
+    view = compact_profile_view(profile)
+    view["path"] = str(input.resolve())
+    typer.echo(json.dumps(view, ensure_ascii=False, indent=2))
 
 
 @papers_app.command("search")
@@ -598,6 +622,12 @@ def proposal_draft(
         ),
     ),
     title: str = typer.Option("Research direction", "--title", "-t"),
+    output: Path | None = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Draft JSON path (default: data/proposals/proposal-draft.json)",
+    ),
 ) -> None:
     """
     Stub debate + write draft proposal JSON under data/proposals/.
@@ -629,7 +659,8 @@ def proposal_draft(
     validate_profile(profile=proposal, schema=prop_schema)
 
     paths.proposals_dir.mkdir(parents=True, exist_ok=True)
-    out = paths.proposals_dir / "proposal-draft.json"
+    out = output or (paths.proposals_dir / "proposal-draft.json")
+    out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(proposal, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     typer.echo(str(out))
 

@@ -74,6 +74,7 @@ uv run autopapers version
 # Phase 1：用户画像
 uv run autopapers profile init -o user_profile.json
 uv run autopapers profile validate -i user_profile.json
+uv run autopapers profile show -i user_profile.json
 
 # 文献检索（AUTOPAPERS_PROVIDER：arxiv / openalex / crossref / local_pdf / aminer）
 # HTTP User-Agent 邮箱（OpenAlex / Crossref / arXiv 等）：优先 AUTOPAPERS_MAILTO，否则 OPENALEX_MAILTO / CROSSREF_MAILTO
@@ -104,6 +105,7 @@ uv run autopapers corpus info
 
 # Phase 2 占位：生成/确认 proposal（未指定 --corpus 时会自动用 data/kg/corpus-snapshot.json）
 uv run autopapers proposal draft --profile user_profile.json
+# uv run autopapers proposal draft --profile user_profile.json -o ./my-draft.json
 uv run autopapers proposal validate -i ./data/proposals/proposal-draft.json
 uv run autopapers proposal confirm -i ./data/proposals/proposal-draft.json
 
