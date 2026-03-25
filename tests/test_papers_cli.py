@@ -59,3 +59,16 @@ def test_show_metadata_requires_path_or_latest() -> None:
 def test_show_metadata_rejects_invalid_latest() -> None:
     r = CliRunner().invoke(app, ["papers", "show-metadata", "--latest", "invalid"])
     assert r.exit_code == 1
+
+
+def test_show_metadata_invalid_json_exits(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    bad = tmp_path / "broken-meta.json"
+    bad.write_text("{", encoding="utf-8")
+    r = CliRunner().invoke(app, ["papers", "show-metadata", "--path", str(bad)])
+    assert r.exit_code == 1
+    err = json.loads(r.stderr)
+    assert err.get("error") == "invalid_json"

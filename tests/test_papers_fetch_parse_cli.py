@@ -125,3 +125,30 @@ def test_papers_parse_batch_processes_glob(
     summary = json.loads(r.stderr.strip())
     assert summary["parsed"] == 2
     assert summary["errors"] == []
+
+
+def test_papers_parse_batch_write_manifest_per_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    indir = tmp_path / "batch_in"
+    indir.mkdir(parents=True)
+    _tiny_pdf(indir / "solo.pdf")
+    r = CliRunner().invoke(
+        app,
+        [
+            "papers",
+            "parse-batch",
+            "--input-dir",
+            str(indir),
+            "--max-pages",
+            "1",
+            "--write-manifest",
+        ],
+    )
+    assert r.exit_code == 0
+    parsed = tmp_path / "data" / "papers" / "parsed"
+    assert (parsed / "solo.txt").is_file()
+    assert (parsed / "solo.manifest.json").is_file()
+    assert "manifest:" in (r.stderr or "").lower()
