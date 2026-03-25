@@ -7,6 +7,61 @@ from autopapers.config import get_paths
 from autopapers.phase1.corpus_snapshot import build_corpus_snapshot, write_corpus_snapshot
 
 
+def test_build_corpus_skips_invalid_metadata_json(tmp_path: Path) -> None:
+    paths = get_paths(repo_root=tmp_path)
+    paths.papers_metadata_dir.mkdir(parents=True)
+    (paths.papers_metadata_dir / "broken.json").write_text("{", encoding="utf-8")
+    (paths.papers_metadata_dir / "search-ok.json").write_text(
+        json.dumps(
+            {
+                "type": "search",
+                "created_at": "2026-01-01T00:00:00Z",
+                "provider": "arxiv",
+                "query": "x",
+                "results": [
+                    {
+                        "source": "arxiv",
+                        "id": "1",
+                        "title": "T",
+                        "pdf_url": None,
+                    }
+                ],
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    snap = build_corpus_snapshot(paths)
+    assert snap["node_count"] >= 2
+
+
+def test_build_corpus_includes_profile_user_and_keywords(tmp_path: Path) -> None:
+    paths = get_paths(repo_root=tmp_path)
+    paths.papers_metadata_dir.mkdir(parents=True)
+    prof = tmp_path / "user.json"
+    prof.write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "user": {"display_name": "Alice"},
+                "research_intent": {
+                    "keywords": ["  gnn  ", "", 99, "rl"],
+                },
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    snap = build_corpus_snapshot(paths, profile_path=prof)
+    types = {n["type"] for n in snap["nodes"]}
+    assert "User" in types
+    assert "Keyword" in types
+    labels = {n["label"] for n in snap["nodes"] if n["type"] == "Keyword"}
+    assert "gnn" in labels
+    assert "rl" in labels
+    assert any(n.get("type") == "User" and n.get("label") == "Alice" for n in snap["nodes"])
+
+
 def test_build_corpus_from_search_metadata(tmp_path: Path) -> None:
     paths = get_paths(repo_root=tmp_path)
     paths.papers_metadata_dir.mkdir(parents=True)
