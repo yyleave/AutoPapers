@@ -41,6 +41,17 @@ def test_merge_truncates_long_killer_in_risks() -> None:
     assert risks[1] == "Compute / data access"
 
 
+def test_merge_truncates_long_radical_in_hypothesis() -> None:
+    long_rad = "q" * 600
+    debate = {
+        "radical": long_rad,
+        "conservative": "c",
+        "killer": "k",
+    }
+    prop = merge_stub_to_proposal(title="T", debate=debate)
+    assert prop["hypothesis"] == "q" * 500
+
+
 def test_merge_stub_to_proposal_passes_status_and_debate_notes() -> None:
     debate = run_debate_stub(profile_summary="p", corpus_summary="c")
     prop = merge_stub_to_proposal(title="My title", debate=debate, status="confirmed")
