@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
@@ -9,15 +8,9 @@ from pathlib import Path
 from typing import Any
 
 from autopapers.providers.base import PaperRef
+from autopapers.providers.polite_ua import polite_user_agent
 
 OPENALEX_WORKS = "https://api.openalex.org/works"
-
-
-def _user_agent() -> str:
-    mail = os.environ.get("OPENALEX_MAILTO", "").strip()
-    if mail:
-        return f"AutoPapers/0.1 (mailto:{mail})"
-    return "AutoPapers/0.1 (https://github.com/yyleave/AutoPapers; respectful polling)"
 
 
 def _openalex_short_id(work_url: str) -> str:
@@ -65,7 +58,9 @@ class OpenAlexProvider:
             {"search": query, "per_page": min(max(limit, 1), 200)}
         )
         url = f"{OPENALEX_WORKS}?{params}"
-        req = urllib.request.Request(url, headers={"User-Agent": _user_agent()})
+        req = urllib.request.Request(
+            url, headers={"User-Agent": polite_user_agent(context="openalex")}
+        )
         with urllib.request.urlopen(req, timeout=30) as resp:
             raw = resp.read()
         data = json.loads(raw.decode("utf-8"))
@@ -99,7 +94,9 @@ class OpenAlexProvider:
         dest_dir.mkdir(parents=True, exist_ok=True)
         safe = "".join(c if c.isalnum() or c in "-_." else "_" for c in ref.id)[:80]
         out = dest_dir / f"{safe}.pdf"
-        req = urllib.request.Request(ref.pdf_url, headers={"User-Agent": _user_agent()})
+        req = urllib.request.Request(
+            ref.pdf_url, headers={"User-Agent": polite_user_agent(context="openalex-pdf")}
+        )
         with urllib.request.urlopen(req, timeout=120) as resp:
             out.write_bytes(resp.read())
         return out

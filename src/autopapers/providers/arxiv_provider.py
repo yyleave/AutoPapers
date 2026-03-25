@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from autopapers.providers.base import PaperRef
+from autopapers.providers.polite_ua import polite_user_agent
 
 ATOM_NS = {"atom": "http://www.w3.org/2005/Atom"}
 
@@ -25,7 +26,10 @@ class ArxivProvider:
     def search(self, *, query: str, limit: int = 5) -> list[PaperRef]:
         q = urllib.parse.quote(query)
         url = f"https://export.arxiv.org/api/query?search_query=all:{q}&start=0&max_results={limit}"
-        with urllib.request.urlopen(url, timeout=20) as resp:
+        req = urllib.request.Request(
+            url, headers={"User-Agent": polite_user_agent(context="arxiv-api")}
+        )
+        with urllib.request.urlopen(req, timeout=20) as resp:
             raw = resp.read()
 
         root = ET.fromstring(raw)
@@ -51,7 +55,10 @@ class ArxivProvider:
             raise ValueError("No pdf_url available for this ref")
         dest_dir.mkdir(parents=True, exist_ok=True)
         out = dest_dir / f"{ref.id}.pdf"
-        with urllib.request.urlopen(ref.pdf_url, timeout=60) as resp:
+        pdf_req = urllib.request.Request(
+            ref.pdf_url, headers={"User-Agent": polite_user_agent(context="arxiv-pdf")}
+        )
+        with urllib.request.urlopen(pdf_req, timeout=60) as resp:
             out.write_bytes(resp.read())
         return out
 

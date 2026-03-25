@@ -16,6 +16,7 @@ def test_build_status_counts(tmp_path: Path) -> None:
     r = build_status(paths=paths, cfg=AppConfig(provider="crossref", log_level="DEBUG"))
     assert r["app_version"]
     assert r["autopapers_repo_root_env_set"] is False
+    assert "polite_mailto_configured" in r
     assert r["config"]["provider"] == "crossref"
     assert r["data"]["metadata_json"] == 1
     assert r["data"]["profiles_json"] == 1

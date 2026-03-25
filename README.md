@@ -76,8 +76,8 @@ uv run autopapers profile init -o user_profile.json
 uv run autopapers profile validate -i user_profile.json
 
 # 文献检索（AUTOPAPERS_PROVIDER：arxiv / openalex / crossref / local_pdf / aminer）
-# 建议在 User-Agent 中带邮箱（各 API polite use）：export OPENALEX_MAILTO='you@example.com'
-# Crossref 亦可：export CROSSREF_MAILTO='you@example.com'
+# HTTP User-Agent 邮箱（OpenAlex / Crossref / arXiv 等）：优先 AUTOPAPERS_MAILTO，否则 OPENALEX_MAILTO / CROSSREF_MAILTO
+# export AUTOPAPERS_MAILTO='you@example.com'
 uv run autopapers papers search -q "transformer" -l 3
 
 # 列出已写入的检索/抓取元数据 JSON（按修改时间倒序）

@@ -6,6 +6,7 @@ from typing import Any
 
 from autopapers import __version__
 from autopapers.config import AppConfig, Paths, default_toml_path, get_paths, load_config
+from autopapers.providers.polite_ua import polite_mailto
 from autopapers.providers.registry import ProviderRegistry
 
 
@@ -36,6 +37,7 @@ def build_status(
     return {
         "app_version": __version__,
         "autopapers_repo_root_env_set": bool(os.environ.get("AUTOPAPERS_REPO_ROOT", "").strip()),
+        "polite_mailto_configured": polite_mailto() is not None,
         "config": {
             "provider": c.provider,
             "log_level": c.log_level,
