@@ -66,15 +66,16 @@ uv sync
 uv run autopapers profile init -o user_profile.json
 uv run autopapers profile validate -i user_profile.json
 
-# 文献检索（AUTOPAPERS_PROVIDER：arxiv / openalex / local_pdf / aminer）
-# OpenAlex 建议在请求头中带邮箱（ polite pool ）：export OPENALEX_MAILTO='you@example.com'
+# 文献检索（AUTOPAPERS_PROVIDER：arxiv / openalex / crossref / local_pdf / aminer）
+# 建议在 User-Agent 中带邮箱（各 API polite use）：export OPENALEX_MAILTO='you@example.com'
+# Crossref 亦可：export CROSSREF_MAILTO='you@example.com'
 uv run autopapers papers search -q "transformer" -l 3
 
 # Phase 1 一键：profile → 搜索 →（可选）拉取首篇 PDF
 uv run autopapers phase1 run --profile user_profile.json --fetch-first
 
-# PDF 转文本（需依赖已安装）
-uv run autopapers papers parse -i ./data/papers/pdfs/some.pdf
+# PDF 转文本（需依赖已安装）；可选写入解析清单 JSON
+uv run autopapers papers parse -i ./data/papers/pdfs/some.pdf --write-manifest
 
 # 从检索元数据合并语料快照（Phase 1 → KG MVP）
 uv run autopapers corpus build

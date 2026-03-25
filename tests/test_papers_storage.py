@@ -4,7 +4,11 @@ import json
 from pathlib import Path
 
 from autopapers.config import get_paths
-from autopapers.phase1.papers.storage import write_fetch_record, write_search_record
+from autopapers.phase1.papers.storage import (
+    write_fetch_record,
+    write_parse_manifest,
+    write_search_record,
+)
 from autopapers.providers.base import PaperRef
 
 
@@ -31,3 +35,23 @@ def test_write_fetch_record(tmp_path: Path) -> None:
     assert p.exists()
     data = json.loads(p.read_text(encoding="utf-8"))
     assert data["type"] == "fetch"
+
+
+def test_write_parse_manifest(tmp_path: Path) -> None:
+    pdf = tmp_path / "doc.pdf"
+    pdf.write_bytes(b"%PDF")
+    txt = tmp_path / "out.txt"
+    txt.write_text("hello\n", encoding="utf-8")
+    m = write_parse_manifest(
+        pdf_path=pdf,
+        txt_path=txt,
+        char_count=5,
+        pages_total=3,
+        pages_read=2,
+        max_pages_config=20,
+    )
+    assert m == tmp_path / "out.manifest.json"
+    data = json.loads(m.read_text(encoding="utf-8"))
+    assert data["type"] == "parse"
+    assert data["char_count"] == 5
+    assert data["pages_total"] == 3

@@ -9,8 +9,12 @@ import typer
 from autopapers.config import get_paths, load_config
 from autopapers.logging_utils import setup_logging
 from autopapers.phase1.corpus_snapshot import build_corpus_snapshot, write_corpus_snapshot
-from autopapers.phase1.papers.parse_pdf import extract_pdf_text
-from autopapers.phase1.papers.storage import write_fetch_record, write_search_record
+from autopapers.phase1.papers.parse_pdf import extract_pdf_text_with_stats
+from autopapers.phase1.papers.storage import (
+    write_fetch_record,
+    write_parse_manifest,
+    write_search_record,
+)
 from autopapers.phase1.profile.extract import load_profile_from_json
 from autopapers.phase1.profile.store import save_profile
 from autopapers.phase1.profile.validate import load_schema, validate_profile
@@ -168,7 +172,7 @@ def papers_fetch(
     source: str = typer.Option(
         ...,
         "--source",
-        help="Source: arxiv, openalex, local_pdf, aminer",
+        help="Source: arxiv, openalex, crossref, local_pdf, aminer",
     ),
     pid: str = typer.Option(..., "--id", help="Paper id (arXiv id or file stem)"),
     title: str | None = typer.Option(None, "--title", help="Optional title"),
@@ -211,6 +215,16 @@ def papers_parse(
         "-o",
         help="Output text path (default: data/papers/parsed/<stem>.txt)",
     ),
+    max_pages: int = typer.Option(
+        20,
+        "--max-pages",
+        help="Max pages to extract (default 20); use 0 for all pages",
+    ),
+    write_manifest: bool = typer.Option(
+        False,
+        "--write-manifest",
+        help="Write <output-stem>.manifest.json beside the .txt",
+    ),
 ) -> None:
     """
     Extract text from PDF into data/papers/parsed/ (uses pypdf).
@@ -219,9 +233,20 @@ def papers_parse(
     paths = get_paths()
     paths.papers_parsed_dir.mkdir(parents=True, exist_ok=True)
     out = output or (paths.papers_parsed_dir / f"{input.stem}.txt")
-    text = extract_pdf_text(input)
+    limit = None if max_pages in (0, None) else max_pages
+    text, pages_total, pages_read = extract_pdf_text_with_stats(input, max_pages=limit)
     out.write_text(text + "\n", encoding="utf-8")
     typer.echo(str(out))
+    if write_manifest:
+        meta = write_parse_manifest(
+            pdf_path=input,
+            txt_path=out,
+            char_count=len(text),
+            pages_total=pages_total,
+            pages_read=pages_read,
+            max_pages_config=max_pages,
+        )
+        typer.echo(f"Wrote manifest: {meta}", err=True)
 
 
 @phase1_app.command("run")
