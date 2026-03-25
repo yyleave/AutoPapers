@@ -11,6 +11,26 @@ from autopapers.providers.crossref_provider import (
 
 
 @patch("autopapers.providers.crossref_provider.urllib.request.urlopen")
+def test_crossref_search_empty_items(mock_urlopen: MagicMock) -> None:
+    body = {"message": {"items": []}}
+    resp = MagicMock()
+    resp.__enter__.return_value.read.return_value = json.dumps(body).encode("utf-8")
+    resp.__exit__.return_value = None
+    mock_urlopen.return_value = resp
+    assert CrossrefProvider().search(query="x", limit=5) == []
+
+
+@patch("autopapers.providers.crossref_provider.urllib.request.urlopen")
+def test_crossref_search_non_list_items_returns_empty(mock_urlopen: MagicMock) -> None:
+    body = {"message": {"items": "not-a-list"}}
+    resp = MagicMock()
+    resp.__enter__.return_value.read.return_value = json.dumps(body).encode("utf-8")
+    resp.__exit__.return_value = None
+    mock_urlopen.return_value = resp
+    assert CrossrefProvider().search(query="x", limit=5) == []
+
+
+@patch("autopapers.providers.crossref_provider.urllib.request.urlopen")
 def test_crossref_search_parses_results(mock_urlopen: MagicMock) -> None:
     body = {
         "message": {

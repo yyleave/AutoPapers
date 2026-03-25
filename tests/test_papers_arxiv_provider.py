@@ -1,8 +1,17 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from autopapers.providers.arxiv_provider import ArxivProvider, _arxiv_id_from_entry_id
+from autopapers.providers.base import PaperRef
+
+
+def test_arxiv_fetch_pdf_requires_pdf_url(tmp_path: Path) -> None:
+    ref = PaperRef(source="arxiv", id="2501.00001", title="T", pdf_url=None)
+    with pytest.raises(ValueError, match="No pdf_url"):
+        ArxivProvider().fetch_pdf(ref=ref, dest_dir=tmp_path)
 
 
 def test_arxiv_id_from_entry_abs_url() -> None:
