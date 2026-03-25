@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 from pypdf import PdfWriter
 from typer.testing import CliRunner
 
 from autopapers.cli import app
+from autopapers.providers.base import PaperRef
+from autopapers.providers.openalex_provider import OpenAlexProvider
 
 
 def _minimal_profile(path: Path, *, pdf_abs: str) -> None:
@@ -243,6 +246,56 @@ def test_phase1_dry_run_no_search(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     assert out["provider"] == "arxiv"
     assert out["limit"] == 5
     assert not (tmp_path / "data").exists()
+
+
+@patch.object(OpenAlexProvider, "search")
+def test_phase1_run_openalex_mocked_writes_search_metadata(
+    mock_search: MagicMock,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    mock_search.return_value = [
+        PaperRef(
+            source="openalex",
+            id="W777",
+            title="Mock work",
+            pdf_url="https://example.org/a.pdf",
+        ),
+    ]
+    prof = tmp_path / "p.json"
+    prof.write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "user": {"languages": ["en"]},
+                "background": {"domains": [], "skills": [], "constraints": []},
+                "hardware": {"device": "other"},
+                "research_intent": {
+                    "problem_statements": [],
+                    "keywords": ["graph", "neural"],
+                    "non_goals": [],
+                    "risk_tolerance": "medium",
+                },
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    r = CliRunner().invoke(
+        app,
+        ["phase1", "run", "--profile", str(prof), "--limit", "2"],
+        env={"AUTOPAPERS_PROVIDER": "openalex"},
+    )
+    assert r.exit_code == 0, r.stdout + r.stderr
+    summary = json.loads(r.stdout)
+    assert summary["count"] == 1
+    meta = Path(summary["metadata_file"])
+    row = json.loads(meta.read_text(encoding="utf-8"))
+    assert row["type"] == "search"
+    assert row["provider"] == "openalex"
+    assert row["query"] == "graph neural"
+    mock_search.assert_called_once_with(query="graph neural", limit=2)
 
 
 def test_phase1_parse_fetched_requires_fetch_first(
