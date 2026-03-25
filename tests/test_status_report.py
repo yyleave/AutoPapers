@@ -89,3 +89,8 @@ def test_build_status_proposal_flags(tmp_path: Path) -> None:
     r = build_status(paths=paths)
     assert r["data"]["proposal_draft_exists"] is True
     assert r["data"]["proposal_confirmed_exists"] is False
+
+    (paths.proposals_dir / "proposal-confirmed.json").write_text("{}", encoding="utf-8")
+    r2 = build_status(paths=paths)
+    assert r2["data"]["proposal_draft_exists"] is True
+    assert r2["data"]["proposal_confirmed_exists"] is True
