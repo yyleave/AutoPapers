@@ -291,6 +291,24 @@ def test_papers_parse_writes_parsed_txt(
     assert txt_path.suffix == ".txt"
 
 
+def test_papers_parse_max_pages_zero_reads_all_pages(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """CLI passes max_pages=0 → extract_and_save_txt gets None (no page cap)."""
+
+    monkeypatch.chdir(tmp_path)
+    pdf = tmp_path / "allpages.pdf"
+    _tiny_pdf(pdf)
+    r = CliRunner().invoke(
+        app,
+        ["papers", "parse", "-i", str(pdf), "--max-pages", "0"],
+    )
+    assert r.exit_code == 0
+    txt_path = Path(r.stdout.strip())
+    assert txt_path.is_file()
+
+
 def test_papers_parse_write_manifest_creates_sidecar(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

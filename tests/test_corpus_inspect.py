@@ -655,3 +655,25 @@ def test_corpus_export_edges_writes_file(tmp_path: Path, monkeypatch: pytest.Mon
     assert r.exit_code == 0
     assert out.is_file()
     assert "source,target,relation" in out.read_text(encoding="utf-8")
+
+
+def test_corpus_export_nodes_writes_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    kg = tmp_path / "data" / "kg"
+    kg.mkdir(parents=True)
+    snap = kg / "corpus-snapshot.json"
+    snap.write_text(
+        json.dumps({"nodes": [{"id": "p1", "type": "Paper", "label": "L"}]}),
+        encoding="utf-8",
+    )
+    out = tmp_path / "nested" / "nodes.csv"
+    r = CliRunner().invoke(
+        app,
+        ["corpus", "export-nodes", "-o", str(out)],
+    )
+    assert r.exit_code == 0
+    assert r.stdout.strip() == str(out.resolve())
+    assert out.is_file()
+    body = out.read_text(encoding="utf-8")
+    assert "id,type,label" in body
+    assert "p1" in body and "Paper" in body

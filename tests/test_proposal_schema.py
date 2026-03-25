@@ -61,3 +61,7 @@ def test_proposal_validate_cli_bad_json(tmp_path: Path, monkeypatch: pytest.Monk
     f.write_text("{", encoding="utf-8")
     r = CliRunner().invoke(app, ["proposal", "validate", "-i", str(f)])
     assert r.exit_code == 1
+    err = json.loads(r.stderr.strip())
+    assert err["ok"] is False
+    assert err["error"] == "invalid_json"
+    assert "detail" in err
