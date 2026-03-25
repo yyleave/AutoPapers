@@ -33,6 +33,31 @@ def _tiny_pdf(path: Path) -> None:
         writer.write(f)
 
 
+def test_phase1_run_search_only_writes_search_metadata(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    pdf = tmp_path / "only_search.pdf"
+    _tiny_pdf(pdf)
+    prof = tmp_path / "p.json"
+    _minimal_profile(prof, pdf_abs=str(pdf.resolve()))
+    r = CliRunner().invoke(
+        app,
+        ["phase1", "run", "--profile", str(prof), "--limit", "1"],
+        env={"AUTOPAPERS_PROVIDER": "local_pdf"},
+    )
+    assert r.exit_code == 0, r.stdout + r.stderr
+    summary = json.loads(r.stdout)
+    assert summary.get("count") == 1
+    meta = Path(summary["metadata_file"])
+    assert meta.is_file()
+    row = json.loads(meta.read_text(encoding="utf-8"))
+    assert row["type"] == "search"
+    pdfs_dir = tmp_path / "data" / "papers" / "pdfs"
+    assert not pdfs_dir.is_dir() or not any(pdfs_dir.glob("*.pdf"))
+
+
 def test_phase1_dry_run_no_search(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
     prof = tmp_path / "p.json"
