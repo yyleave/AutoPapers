@@ -4,6 +4,7 @@ import json
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import cast
 
 import typer
 
@@ -12,6 +13,7 @@ from autopapers.config import get_paths, load_config
 from autopapers.logging_utils import setup_logging
 from autopapers.phase1.corpus_inspect import summarize_corpus_snapshot
 from autopapers.phase1.corpus_snapshot import build_corpus_snapshot, write_corpus_snapshot
+from autopapers.phase1.papers.metadata_pick import MetadataKind, newest_papers_metadata
 from autopapers.phase1.papers.parse_pdf import extract_and_save_txt
 from autopapers.phase1.papers.storage import (
     write_fetch_record,
@@ -216,6 +218,62 @@ def papers_list_metadata(
         )
     typer.echo(
         json.dumps({"metadata_dir": str(d), "files": rows}, ensure_ascii=False, indent=2)
+    )
+
+
+@papers_app.command("show-metadata")
+def papers_show_metadata(
+    path: Path | None = typer.Option(
+        None,
+        "--path",
+        exists=True,
+        dir_okay=False,
+        help="Metadata JSON file",
+    ),
+    latest: str | None = typer.Option(
+        None,
+        "--latest",
+        help="Print newest under metadata/: search | fetch | any",
+    ),
+) -> None:
+    """Pretty-print one metadata JSON (--path or --latest, not both)."""
+
+    if (path is None) == (latest is None):
+        typer.echo("Provide exactly one of --path or --latest", err=True)
+        raise typer.Exit(code=1)
+    if latest is not None and latest not in ("search", "fetch", "any"):
+        typer.echo("--latest must be one of: search, fetch, any", err=True)
+        raise typer.Exit(code=1)
+
+    paths = get_paths()
+    if path is None:
+        picked = newest_papers_metadata(paths, kind=cast(MetadataKind, latest))
+        if picked is None:
+            typer.echo(
+                json.dumps({"error": "no_metadata_files", "kind": latest}, indent=2),
+                err=True,
+            )
+            raise typer.Exit(code=1)
+        path = picked
+
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        typer.echo(
+            json.dumps(
+                {
+                    "error": "invalid_json",
+                    "path": str(path.resolve()),
+                    "detail": str(e),
+                },
+                indent=2,
+            ),
+            err=True,
+        )
+        raise typer.Exit(code=1) from e
+
+    typer.echo(
+        json.dumps({"file": str(path.resolve()), "data": data}, ensure_ascii=False, indent=2)
     )
 
 

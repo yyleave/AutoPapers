@@ -83,6 +83,9 @@ uv run autopapers papers search -q "transformer" -l 3
 # 列出已写入的检索/抓取元数据 JSON（按修改时间倒序）
 uv run autopapers papers list-metadata
 
+# 查看某条元数据（显式路径，或 --latest search|fetch|any）
+uv run autopapers papers show-metadata --latest search
+
 # Phase 1 一键：profile → 搜索 →（可选）拉取首篇 PDF →（可选）转文本 + manifest
 uv run autopapers phase1 run --profile user_profile.json --fetch-first --parse-fetched
 
