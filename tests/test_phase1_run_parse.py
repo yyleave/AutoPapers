@@ -338,6 +338,83 @@ def test_phase1_dry_run_crossref_provider_no_search(
     assert not (tmp_path / "data").exists()
 
 
+def test_phase1_dry_run_openalex_provider_no_search(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    prof = tmp_path / "p.json"
+    prof.write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "user": {"languages": ["en"]},
+                "background": {"domains": [], "skills": [], "constraints": []},
+                "hardware": {"device": "other"},
+                "research_intent": {
+                    "problem_statements": [],
+                    "keywords": ["science", "mapping"],
+                    "non_goals": [],
+                    "risk_tolerance": "medium",
+                },
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    r = CliRunner().invoke(
+        app,
+        ["phase1", "run", "--profile", str(prof), "--dry-run", "--limit", "4"],
+        env={"AUTOPAPERS_PROVIDER": "openalex"},
+    )
+    assert r.exit_code == 0
+    out = json.loads(r.stdout)
+    assert out["dry_run"] is True
+    assert out["provider"] == "openalex"
+    assert out["limit"] == 4
+    assert "science" in out["query"] and "mapping" in out["query"]
+    assert not (tmp_path / "data").exists()
+
+
+def test_phase1_dry_run_local_pdf_provider_no_search(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    pdf_dir = tmp_path / "my_pdfs"
+    pdf_dir.mkdir()
+    prof = tmp_path / "p.json"
+    prof.write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "user": {"languages": ["en"]},
+                "background": {"domains": [], "skills": [], "constraints": []},
+                "hardware": {"device": "other"},
+                "research_intent": {
+                    "problem_statements": [],
+                    "keywords": [str(pdf_dir.resolve())],
+                    "non_goals": [],
+                    "risk_tolerance": "medium",
+                },
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    r = CliRunner().invoke(
+        app,
+        ["phase1", "run", "--profile", str(prof), "--dry-run"],
+        env={"AUTOPAPERS_PROVIDER": "local_pdf"},
+    )
+    assert r.exit_code == 0
+    out = json.loads(r.stdout)
+    assert out["dry_run"] is True
+    assert out["provider"] == "local_pdf"
+    assert str(pdf_dir.resolve()) in out["query"]
+    assert not (tmp_path / "data").exists()
+
+
 @patch.object(OpenAlexProvider, "search")
 def test_phase1_run_openalex_mocked_writes_search_metadata(
     mock_search: MagicMock,
