@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 from typer.testing import CliRunner
 
 from autopapers.cli import app
+from autopapers.providers.arxiv_provider import ArxivProvider
+from autopapers.providers.base import PaperRef
 
 
 def test_papers_search_local_pdf_directory_lists_pdfs(
@@ -72,6 +75,39 @@ def test_papers_search_writes_search_metadata_when_not_no_save(
     assert row["count"] == 1
 
 
+@patch.object(ArxivProvider, "search")
+def test_papers_search_arxiv_cli_mocked_writes_search_metadata(
+    mock_search: MagicMock,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("AUTOPAPERS_PROVIDER", "arxiv")
+    mock_search.return_value = [
+        PaperRef(
+            source="arxiv",
+            id="2501.00002",
+            title="Mock paper",
+            pdf_url="https://arxiv.org/pdf/2501.00002.pdf",
+        ),
+    ]
+    r = CliRunner().invoke(app, ["papers", "search", "-q", "attention", "--limit", "1"])
+    assert r.exit_code == 0
+    rows = json.loads(r.stdout.strip())
+    assert len(rows) == 1
+    assert rows[0]["id"] == "2501.00002"
+    assert "Wrote metadata" in (r.stderr or "")
+    meta_dir = tmp_path / "data" / "papers" / "metadata"
+    found = list(meta_dir.glob("search-*.json"))
+    assert len(found) == 1
+    row = json.loads(found[0].read_text(encoding="utf-8"))
+    assert row["type"] == "search"
+    assert row["provider"] == "arxiv"
+    assert row["query"] == "attention"
+    assert row["count"] == 1
+    mock_search.assert_called_once_with(query="attention", limit=1)
+
+
 def test_show_metadata_latest_empty_dir_exits(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -86,6 +122,20 @@ def test_show_metadata_latest_empty_dir_exits(
 
 def test_show_metadata_requires_path_or_latest() -> None:
     r = CliRunner().invoke(app, ["papers", "show-metadata"])
+    assert r.exit_code == 1
+
+
+def test_show_metadata_rejects_path_and_latest_together(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    f = tmp_path / "meta.json"
+    f.write_text("{}", encoding="utf-8")
+    r = CliRunner().invoke(
+        app,
+        ["papers", "show-metadata", "--path", str(f), "--latest", "any"],
+    )
     assert r.exit_code == 1
 
 
