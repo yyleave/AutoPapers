@@ -33,6 +33,44 @@ def _tiny_pdf(path: Path) -> None:
         writer.write(f)
 
 
+def test_phase1_run_empty_local_dir_writes_zero_count_metadata(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    empty_dir = tmp_path / "no_pdfs"
+    empty_dir.mkdir()
+    prof = tmp_path / "p.json"
+    prof.write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "user": {"languages": ["en"]},
+                "background": {"domains": [], "skills": [], "constraints": []},
+                "hardware": {"device": "other"},
+                "research_intent": {
+                    "problem_statements": [],
+                    "keywords": [str(empty_dir.resolve())],
+                    "non_goals": [],
+                    "risk_tolerance": "medium",
+                },
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    r = CliRunner().invoke(
+        app,
+        ["phase1", "run", "--profile", str(prof), "--limit", "3"],
+        env={"AUTOPAPERS_PROVIDER": "local_pdf"},
+    )
+    assert r.exit_code == 0
+    payload = json.loads(r.stdout)
+    assert payload["count"] == 0
+    meta = Path(payload["metadata_file"])
+    assert json.loads(meta.read_text(encoding="utf-8"))["count"] == 0
+
+
 def test_phase1_run_search_only_writes_search_metadata(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
