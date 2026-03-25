@@ -4,16 +4,17 @@ import json
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import typer
 
 from autopapers import __version__ as autopapers_version
-from autopapers.config import get_paths, load_config
+from autopapers.config import Paths, get_paths, load_config
 from autopapers.logging_utils import setup_logging
 from autopapers.phase1.corpus_inspect import (
     load_corpus_snapshot_document,
     snapshot_edges_to_csv,
+    snapshot_nodes_to_csv,
     summarize_corpus_snapshot,
 )
 from autopapers.phase1.corpus_snapshot import build_corpus_snapshot, write_corpus_snapshot
@@ -71,6 +72,51 @@ def _schema_path() -> Path:
 
 def _proposal_schema_path() -> Path:
     return Path(__file__).resolve().parent / "schemas" / "research_proposal.schema.json"
+
+
+def _load_corpus_snapshot_for_cli(
+    paths: Paths,
+    snapshot: Path | None,
+) -> tuple[Path, dict[str, Any]]:
+    path = snapshot or (paths.kg_dir / "corpus-snapshot.json")
+    if not path.is_file():
+        typer.echo(
+            json.dumps(
+                {"error": "snapshot_not_found", "path": str(path.resolve())},
+                indent=2,
+            ),
+            err=True,
+        )
+        raise typer.Exit(code=1)
+    try:
+        data = load_corpus_snapshot_document(path)
+    except json.JSONDecodeError as e:
+        typer.echo(
+            json.dumps(
+                {
+                    "error": "invalid_json",
+                    "path": str(path.resolve()),
+                    "detail": str(e),
+                },
+                indent=2,
+            ),
+            err=True,
+        )
+        raise typer.Exit(code=1) from e
+    except TypeError as e:
+        typer.echo(
+            json.dumps(
+                {
+                    "error": "expected_object",
+                    "path": str(path.resolve()),
+                    "detail": str(e),
+                },
+                indent=2,
+            ),
+            err=True,
+        )
+        raise typer.Exit(code=1) from e
+    return path, data
 
 
 @app.command("status")
@@ -572,36 +618,7 @@ def corpus_info(
     """Print node/edge summaries for an existing corpus snapshot (no rebuild)."""
 
     paths = get_paths()
-    path = snapshot or (paths.kg_dir / "corpus-snapshot.json")
-    if not path.is_file():
-        typer.echo(
-            json.dumps(
-                {"error": "snapshot_not_found", "path": str(path.resolve())},
-                indent=2,
-            ),
-            err=True,
-        )
-        raise typer.Exit(code=1)
-    try:
-        data = load_corpus_snapshot_document(path)
-    except json.JSONDecodeError as e:
-        typer.echo(
-            json.dumps(
-                {"error": "invalid_json", "path": str(path.resolve()), "detail": str(e)},
-                indent=2,
-            ),
-            err=True,
-        )
-        raise typer.Exit(code=1) from e
-    except TypeError as e:
-        typer.echo(
-            json.dumps(
-                {"error": "expected_object", "path": str(path.resolve()), "detail": str(e)},
-                indent=2,
-            ),
-            err=True,
-        )
-        raise typer.Exit(code=1) from e
+    path, data = _load_corpus_snapshot_for_cli(paths, snapshot)
     summary = summarize_corpus_snapshot(data)
     summary["snapshot"] = str(path.resolve())
     typer.echo(json.dumps(summary, ensure_ascii=False, indent=2))
@@ -627,38 +644,39 @@ def corpus_export_edges(
     """Export graph edges from a corpus snapshot as CSV (source,target,relation)."""
 
     paths = get_paths()
-    path = snapshot or (paths.kg_dir / "corpus-snapshot.json")
-    if not path.is_file():
-        typer.echo(
-            json.dumps(
-                {"error": "snapshot_not_found", "path": str(path.resolve())},
-                indent=2,
-            ),
-            err=True,
-        )
-        raise typer.Exit(code=1)
-    try:
-        data = load_corpus_snapshot_document(path)
-    except json.JSONDecodeError as e:
-        typer.echo(
-            json.dumps(
-                {"error": "invalid_json", "path": str(path.resolve()), "detail": str(e)},
-                indent=2,
-            ),
-            err=True,
-        )
-        raise typer.Exit(code=1) from e
-    except TypeError as e:
-        typer.echo(
-            json.dumps(
-                {"error": "expected_object", "path": str(path.resolve()), "detail": str(e)},
-                indent=2,
-            ),
-            err=True,
-        )
-        raise typer.Exit(code=1) from e
+    _, data = _load_corpus_snapshot_for_cli(paths, snapshot)
 
     csv_text = snapshot_edges_to_csv(data)
+    if output is not None:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(csv_text, encoding="utf-8")
+        typer.echo(str(output.resolve()))
+    else:
+        typer.echo(csv_text.rstrip("\n"))
+
+
+@corpus_app.command("export-nodes")
+def corpus_export_nodes(
+    snapshot: Path | None = typer.Option(
+        None,
+        "--snapshot",
+        "-s",
+        exists=True,
+        dir_okay=False,
+        help="Snapshot JSON (default: data/kg/corpus-snapshot.json)",
+    ),
+    output: Path | None = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Write CSV here (default: print to stdout)",
+    ),
+) -> None:
+    """Export graph nodes from a corpus snapshot as CSV (id,type,label)."""
+
+    paths = get_paths()
+    _, data = _load_corpus_snapshot_for_cli(paths, snapshot)
+    csv_text = snapshot_nodes_to_csv(data)
     if output is not None:
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(csv_text, encoding="utf-8")

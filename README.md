@@ -105,6 +105,7 @@ uv run autopapers corpus info
 
 # 将快照中的边导出为 CSV（默认打印；可用 -o 写入文件）
 uv run autopapers corpus export-edges
+uv run autopapers corpus export-nodes
 
 # Phase 2 占位：生成/确认 proposal（未指定 --corpus 时会自动用 data/kg/corpus-snapshot.json）
 uv run autopapers proposal draft --profile user_profile.json

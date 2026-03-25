@@ -73,3 +73,27 @@ def snapshot_edges_to_csv(data: dict[str, Any]) -> str:
             ]
         )
     return buf.getvalue()
+
+
+def snapshot_nodes_to_csv(data: dict[str, Any]) -> str:
+    """Serialize snapshot ``nodes`` to CSV (header: id,type,label)."""
+
+    nodes_raw = data.get("nodes")
+    nodes = nodes_raw if isinstance(nodes_raw, list) else []
+    buf = StringIO()
+    w = csv.writer(buf, lineterminator="\n")
+    w.writerow(["id", "type", "label"])
+    for n in nodes:
+        if not isinstance(n, dict):
+            continue
+        nid = n.get("id", "")
+        typ = n.get("type", "")
+        lab = n.get("label")
+        if lab is None:
+            lab_s = ""
+        elif isinstance(lab, (str, int, float, bool)):
+            lab_s = str(lab)
+        else:
+            lab_s = json.dumps(lab, ensure_ascii=False)
+        w.writerow([nid, typ, lab_s])
+    return buf.getvalue()

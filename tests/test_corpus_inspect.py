@@ -10,6 +10,7 @@ from autopapers.cli import app
 from autopapers.phase1.corpus_inspect import (
     load_corpus_snapshot_document,
     snapshot_edges_to_csv,
+    snapshot_nodes_to_csv,
     summarize_corpus_snapshot,
 )
 
@@ -57,6 +58,19 @@ def test_corpus_info_missing_exits(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     assert r.exit_code == 1
 
 
+def test_snapshot_nodes_to_csv_rows() -> None:
+    data = {
+        "nodes": [
+            {"id": "n1", "type": "Paper", "label": "Title"},
+            {"id": "n2", "type": "Fetch", "label": None},
+        ]
+    }
+    csv = snapshot_nodes_to_csv(data)
+    lines = csv.strip().split("\n")
+    assert lines[0] == "id,type,label"
+    assert "n1,Paper,Title" in lines
+
+
 def test_snapshot_edges_to_csv_rows() -> None:
     data = {"edges": [{"source": "x", "target": "y", "relation": "R"}]}
     csv = snapshot_edges_to_csv(data)
@@ -92,6 +106,20 @@ def test_corpus_export_edges_cli(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     r = CliRunner().invoke(app, ["corpus", "export-edges"])
     assert r.exit_code == 0
     assert "FETCHED" in r.stdout
+
+
+def test_corpus_export_nodes_cli(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    kg = tmp_path / "data" / "kg"
+    kg.mkdir(parents=True)
+    snap = kg / "corpus-snapshot.json"
+    snap.write_text(
+        json.dumps({"nodes": [{"id": "x", "type": "Paper", "label": "L"}]}),
+        encoding="utf-8",
+    )
+    r = CliRunner().invoke(app, ["corpus", "export-nodes"])
+    assert r.exit_code == 0
+    assert "Paper" in r.stdout
 
 
 def test_corpus_export_edges_writes_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
