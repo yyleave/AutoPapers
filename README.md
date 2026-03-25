@@ -105,6 +105,8 @@ uv run autopapers papers parse-batch --input-dir ./data/papers/pdfs --write-mani
 uv run autopapers corpus build
 # 可选：把用户画像里的关键词并入图中
 uv run autopapers corpus build --profile user_profile.json
+# 只计算合并结果统计，不写 corpus-snapshot.json
+# uv run autopapers corpus build --dry-run
 # 查看当前快照的节点类型 / 边类型统计（不重新 build）
 uv run autopapers corpus info
 

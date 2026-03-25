@@ -648,6 +648,11 @@ def corpus_build(
         dir_okay=False,
         help="Optional profile JSON to add User/Keyword nodes",
     ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Compute snapshot in memory and print summary only; do not write JSON",
+    ),
 ) -> None:
     """
     Build data/kg/corpus-snapshot.json from metadata, fetch records, and parse manifests.
@@ -657,6 +662,12 @@ def corpus_build(
 
     paths = get_paths()
     snap = build_corpus_snapshot(paths, profile_path=profile)
+    if dry_run:
+        summary = summarize_corpus_snapshot(snap)
+        summary["dry_run"] = True
+        summary["would_write"] = str((paths.kg_dir / "corpus-snapshot.json").resolve())
+        typer.echo(json.dumps(summary, ensure_ascii=False, indent=2))
+        return
     out = write_corpus_snapshot(paths, snap)
     typer.echo(str(out))
 

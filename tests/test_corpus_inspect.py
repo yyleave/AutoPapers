@@ -51,6 +51,19 @@ def test_corpus_info_cli(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
     assert "Paper" in out["nodes_by_type"]
 
 
+def test_corpus_build_dry_run_skips_write(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    runner = CliRunner()
+    r = runner.invoke(app, ["corpus", "build", "--dry-run"])
+    assert r.exit_code == 0
+    out = json.loads(r.stdout)
+    assert out["dry_run"] is True
+    assert "would_write" in out
+    assert "node_total" in out
+    snap = tmp_path / "data" / "kg" / "corpus-snapshot.json"
+    assert not snap.is_file()
+
+
 def test_corpus_info_missing_exits(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
     runner = CliRunner()
