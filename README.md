@@ -66,7 +66,8 @@ uv sync
 uv run autopapers profile init -o user_profile.json
 uv run autopapers profile validate -i user_profile.json
 
-# 文献检索（默认 provider 可由环境变量 AUTOPAPERS_PROVIDER 设置：arxiv / local_pdf / aminer）
+# 文献检索（AUTOPAPERS_PROVIDER：arxiv / openalex / local_pdf / aminer）
+# OpenAlex 建议在请求头中带邮箱（ polite pool ）：export OPENALEX_MAILTO='you@example.com'
 uv run autopapers papers search -q "transformer" -l 3
 
 # Phase 1 一键：profile → 搜索 →（可选）拉取首篇 PDF

@@ -165,7 +165,11 @@ def papers_search(
 
 @papers_app.command("fetch")
 def papers_fetch(
-    source: str = typer.Option(..., "--source", help="Source name (arxiv/local_pdf/aminer)"),
+    source: str = typer.Option(
+        ...,
+        "--source",
+        help="Source: arxiv, openalex, local_pdf, aminer",
+    ),
     pid: str = typer.Option(..., "--id", help="Paper id (arXiv id or file stem)"),
     title: str | None = typer.Option(None, "--title", help="Optional title"),
     pdf_url: str | None = typer.Option(None, "--pdf-url", help="Optional pdf url or local path"),

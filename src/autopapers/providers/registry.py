@@ -6,6 +6,7 @@ from autopapers.providers.aminer_provider import AminerProvider
 from autopapers.providers.arxiv_provider import ArxivProvider
 from autopapers.providers.base import Provider
 from autopapers.providers.local_pdf_provider import LocalPdfProvider
+from autopapers.providers.openalex_provider import OpenAlexProvider
 
 
 @dataclass(frozen=True)
@@ -18,6 +19,7 @@ class ProviderRegistry:
             "arxiv": ArxivProvider(),
             "local_pdf": LocalPdfProvider(),
             "aminer": AminerProvider(),
+            "openalex": OpenAlexProvider(),
         }
         return cls(providers=providers)
 
