@@ -10,6 +10,7 @@ from typer.testing import CliRunner
 from autopapers.cli import app
 from autopapers.providers.arxiv_provider import ArxivProvider
 from autopapers.providers.base import PaperRef
+from autopapers.providers.crossref_provider import CrossrefProvider
 from autopapers.providers.openalex_provider import OpenAlexProvider
 
 
@@ -192,6 +193,65 @@ def test_papers_search_openalex_no_save_skips_metadata_write(
     meta_dir = tmp_path / "data" / "papers" / "metadata"
     assert (not meta_dir.is_dir()) or not list(meta_dir.glob("search-*.json"))
     mock_search.assert_called_once_with(query="q", limit=3)
+
+
+@patch.object(CrossrefProvider, "search")
+def test_papers_search_crossref_cli_mocked_writes_search_metadata(
+    mock_search: MagicMock,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("AUTOPAPERS_PROVIDER", "crossref")
+    mock_search.return_value = [
+        PaperRef(
+            source="crossref",
+            id="10.1000/cr",
+            title="Crossref CLI mock",
+            pdf_url="https://journals.example/a.pdf",
+        ),
+    ]
+    r = CliRunner().invoke(
+        app,
+        ["papers", "search", "-q", "machine learning survey", "--limit", "5"],
+    )
+    assert r.exit_code == 0
+    rows = json.loads(r.stdout.strip())
+    assert len(rows) == 1
+    assert rows[0]["id"] == "10.1000/cr"
+    assert "Wrote metadata" in (r.stderr or "")
+    found = list((tmp_path / "data" / "papers" / "metadata").glob("search-*.json"))
+    assert len(found) == 1
+    row = json.loads(found[0].read_text(encoding="utf-8"))
+    assert row["provider"] == "crossref"
+    assert row["query"] == "machine learning survey"
+    assert row["count"] == 1
+    mock_search.assert_called_once_with(query="machine learning survey", limit=5)
+
+
+@patch.object(CrossrefProvider, "search")
+def test_papers_search_crossref_no_save_skips_metadata_write(
+    mock_search: MagicMock,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("AUTOPAPERS_PROVIDER", "crossref")
+    mock_search.return_value = [
+        PaperRef(source="crossref", id="10.0/nosave", title="N", pdf_url=None),
+    ]
+    r = CliRunner().invoke(
+        app,
+        ["papers", "search", "-q", "cells", "--limit", "2", "--no-save"],
+    )
+    assert r.exit_code == 0
+    rows = json.loads(r.stdout.strip())
+    assert len(rows) == 1
+    assert rows[0]["id"] == "10.0/nosave"
+    assert "Wrote metadata" not in (r.stderr or "")
+    meta_dir = tmp_path / "data" / "papers" / "metadata"
+    assert (not meta_dir.is_dir()) or not list(meta_dir.glob("search-*.json"))
+    mock_search.assert_called_once_with(query="cells", limit=2)
 
 
 def test_show_metadata_latest_empty_dir_exits(
