@@ -1,0 +1,80 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+from pypdf import PdfWriter
+from typer.testing import CliRunner
+
+from autopapers.cli import app
+
+
+def _minimal_profile(path: Path, *, pdf_abs: str) -> None:
+    doc = {
+        "schema_version": "0.1",
+        "user": {"languages": ["en"]},
+        "background": {"domains": [], "skills": [], "constraints": []},
+        "hardware": {"device": "other"},
+        "research_intent": {
+            "problem_statements": [],
+            "keywords": [pdf_abs],
+            "non_goals": [],
+            "risk_tolerance": "medium",
+        },
+    }
+    path.write_text(json.dumps(doc, indent=2), encoding="utf-8")
+
+
+def _tiny_pdf(path: Path) -> None:
+    writer = PdfWriter()
+    writer.add_blank_page(width=72, height=72)
+    with path.open("wb") as f:
+        writer.write(f)
+
+
+def test_phase1_parse_fetched_requires_fetch_first(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    prof = tmp_path / "p.json"
+    _minimal_profile(prof, pdf_abs=str(tmp_path / "x.pdf"))
+    runner = CliRunner()
+    r = runner.invoke(
+        app,
+        ["phase1", "run", "--profile", str(prof), "--parse-fetched"],
+        env={"AUTOPAPERS_PROVIDER": "local_pdf"},
+    )
+    assert r.exit_code == 1
+
+
+def test_phase1_parse_fetched_writes_parsed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    pdf = tmp_path / "doc.pdf"
+    _tiny_pdf(pdf)
+    prof = tmp_path / "p.json"
+    _minimal_profile(prof, pdf_abs=str(pdf.resolve()))
+
+    runner = CliRunner()
+    r = runner.invoke(
+        app,
+        [
+            "phase1",
+            "run",
+            "--profile",
+            str(prof),
+            "--fetch-first",
+            "--parse-fetched",
+            "--limit",
+            "1",
+        ],
+        env={"AUTOPAPERS_PROVIDER": "local_pdf"},
+    )
+    assert r.exit_code == 0, r.stdout + r.stderr
+    parsed = tmp_path / "data" / "papers" / "parsed" / "doc.txt"
+    assert parsed.is_file()
+    man = tmp_path / "data" / "papers" / "parsed" / "doc.manifest.json"
+    assert man.is_file()

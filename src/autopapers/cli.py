@@ -335,10 +335,24 @@ def phase1_run(
         "--fetch-first",
         help="Fetch PDF for the first search hit",
     ),
+    parse_fetched: bool = typer.Option(
+        False,
+        "--parse-fetched",
+        help="After --fetch-first, extract text + .manifest.json under data/papers/parsed/",
+    ),
+    parse_max_pages: int = typer.Option(
+        20,
+        "--parse-max-pages",
+        help="With --parse-fetched: max pages (0 = all)",
+    ),
 ) -> None:
     """
     Load profile → build query from keywords/problem_statements → search → optional fetch #1.
     """
+
+    if parse_fetched and not fetch_first:
+        typer.echo("Error: --parse-fetched requires --fetch-first", err=True)
+        raise typer.Exit(code=1)
 
     schema_path = _schema_path()
     data = load_profile_from_json(profile)
@@ -370,7 +384,28 @@ def phase1_run(
             title=r0.title,
             pdf_path=pdf_path,
         )
-        typer.echo(json.dumps({"pdf": str(pdf_path), "fetch_metadata": str(fmeta)}, indent=2))
+        payload: dict[str, object] = {
+            "pdf": str(pdf_path),
+            "fetch_metadata": str(fmeta),
+        }
+        if parse_fetched:
+            paths.papers_parsed_dir.mkdir(parents=True, exist_ok=True)
+            out_txt = paths.papers_parsed_dir / f"{pdf_path.stem}.txt"
+            limit = None if parse_max_pages == 0 else parse_max_pages
+            text, pages_total, pages_read = extract_and_save_txt(
+                pdf_path, out_txt, max_pages=limit
+            )
+            pmeta = write_parse_manifest(
+                pdf_path=pdf_path,
+                txt_path=out_txt,
+                char_count=len(text),
+                pages_total=pages_total,
+                pages_read=pages_read,
+                max_pages_config=parse_max_pages,
+            )
+            payload["parsed_txt"] = str(out_txt)
+            payload["parse_manifest"] = str(pmeta)
+        typer.echo(json.dumps(payload, indent=2))
 
 
 @corpus_app.command("build")

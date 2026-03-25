@@ -74,8 +74,8 @@ uv run autopapers profile validate -i user_profile.json
 # Crossref 亦可：export CROSSREF_MAILTO='you@example.com'
 uv run autopapers papers search -q "transformer" -l 3
 
-# Phase 1 一键：profile → 搜索 →（可选）拉取首篇 PDF
-uv run autopapers phase1 run --profile user_profile.json --fetch-first
+# Phase 1 一键：profile → 搜索 →（可选）拉取首篇 PDF →（可选）转文本 + manifest
+uv run autopapers phase1 run --profile user_profile.json --fetch-first --parse-fetched
 
 # PDF 转文本（需依赖已安装）；可选写入解析清单 JSON
 uv run autopapers papers parse -i ./data/papers/pdfs/some.pdf --write-manifest
