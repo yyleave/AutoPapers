@@ -74,11 +74,11 @@ class PaperFetcher:
         """
         获取论文全文
 
-        策略：
-        1. 检查 AMiner 是否提供 PDF 链接
-        2. 通过 Anna's Archive 搜索
-        3. 如果有 DOI，尝试通过 DOI 搜索
-        4. 打开浏览器让用户手动下载
+        策略（优先级从高到低）：
+        1. DOI 搜索（最精确）
+        2. AMiner PDF 链接
+        3. 标题+作者搜索
+        4. 打开浏览器手动下载
 
         Args:
             paper: 论文对象
@@ -90,44 +90,32 @@ class PaperFetcher:
         """
         print(f"\n获取全文: {paper.title}")
 
-        # 策略 1: 检查 AMiner PDF 链接
+        # 策略 1 (最高优先级): DOI 搜索 - 最精确
+        if paper.doi:
+            print(f"[优先] 通过 DOI 搜索: {paper.doi}")
+            if open_browser:
+                # 直接打开浏览器用 DOI 搜索
+                search_url = f"{self.annas.BASE_URL}/search?q={quote(paper.doi)}&content=journal_article"
+                print(f"打开: {search_url}")
+                webbrowser.open(search_url)
+            return None
+
+        # 策略 2: 检查 AMiner PDF 链接
         if paper.pdf_url:
             print(f"AMiner 提供 PDF 链接: {paper.pdf_url}")
             if open_browser:
                 webbrowser.open(paper.pdf_url)
             return None
 
-        # 策略 2: 构建搜索查询
+        # 策略 3: 通过标题和作者搜索
         query = paper.title
         if paper.authors:
             query += f" {paper.authors[0]}"
 
-        # 策略 3: 如果有 DOI，优先使用 DOI
-        if paper.doi:
-            print(f"通过 DOI 搜索: {paper.doi}")
-            results = self.annas.search_by_doi(paper.doi)
-            if results:
-                print(f"找到 {len(results)} 个结果")
-                if auto_download:
-                    return self._download_best_result(results, paper.title)
-
-        # 策略 4: 通过标题和作者搜索
         print(f"通过标题搜索: {query}")
-        results = self.annas.search_by_title(
-            paper.title,
-            author=paper.authors[0] if paper.authors else None
-        )
-
-        if results:
-            print(f"找到 {len(results)} 个结果")
-            if auto_download:
-                return self._download_best_result(results, paper.title)
-
-        # 策略 5: 打开浏览器手动搜索
         if open_browser:
-            print("\n自动搜索无结果，打开浏览器...")
-            search_url = f"{self.annas.SCIDB_URL}?q={quote(query)}"
-            print(f"URL: {search_url}")
+            search_url = f"{self.annas.SCIDB_URL}?q={quote(query)}&content=journal_article"
+            print(f"打开: {search_url}")
             webbrowser.open(search_url)
 
         return None
