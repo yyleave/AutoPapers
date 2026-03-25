@@ -501,6 +501,29 @@ def test_corpus_export_edges_missing_default_snapshot_exits(
     assert err["error"] == "snapshot_not_found"
 
 
+def test_corpus_export_edges_cli_empty_edges_prints_header_only(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    kg = tmp_path / "data" / "kg"
+    kg.mkdir(parents=True)
+    (kg / "corpus-snapshot.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "nodes": [{"id": "n1", "type": "TextExtract", "label": "t"}],
+                "edges": [],
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    r = CliRunner().invoke(app, ["corpus", "export-edges"])
+    assert r.exit_code == 0
+    assert r.stdout.strip() == "source,target,relation"
+
+
 def test_corpus_export_nodes_invalid_snapshot_json_exits(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

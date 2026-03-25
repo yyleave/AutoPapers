@@ -27,6 +27,20 @@ def test_merge_truncates_long_conservative_in_problem() -> None:
     assert tail == "x" * 400 + "…"
 
 
+def test_merge_truncates_long_killer_in_risks() -> None:
+    long_kill = "z" * 400
+    debate = {
+        "radical": "r",
+        "conservative": "c",
+        "killer": long_kill,
+    }
+    prop = merge_stub_to_proposal(title="T", debate=debate)
+    risks = prop["risks"]
+    assert isinstance(risks, list)
+    assert risks[0] == "z" * 300
+    assert risks[1] == "Compute / data access"
+
+
 def test_merge_stub_to_proposal_passes_status_and_debate_notes() -> None:
     debate = run_debate_stub(profile_summary="p", corpus_summary="c")
     prop = merge_stub_to_proposal(title="My title", debate=debate, status="confirmed")
