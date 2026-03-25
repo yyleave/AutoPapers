@@ -8,9 +8,12 @@ import typer
 
 from autopapers.config import get_paths, load_config
 from autopapers.logging_utils import setup_logging
+from autopapers.phase1.papers.parse_pdf import extract_pdf_text
+from autopapers.phase1.papers.storage import write_fetch_record, write_search_record
 from autopapers.phase1.profile.extract import load_profile_from_json
 from autopapers.phase1.profile.store import save_profile
 from autopapers.phase1.profile.validate import load_schema, validate_profile
+from autopapers.phase2.debate import merge_stub_to_proposal, run_debate_stub
 from autopapers.providers.base import PaperRef
 from autopapers.providers.registry import ProviderRegistry
 
@@ -20,6 +23,12 @@ app.add_typer(profile_app, name="profile")
 
 papers_app = typer.Typer(help="Phase 1: paper search/fetch (provider-based)")
 app.add_typer(papers_app, name="papers")
+
+phase1_app = typer.Typer(help="Phase 1: profile → search → optional fetch")
+app.add_typer(phase1_app, name="phase1")
+
+proposal_app = typer.Typer(help="Phase 2: proposal draft / confirm (stub debate)")
+app.add_typer(proposal_app, name="proposal")
 
 
 @app.callback()
@@ -37,6 +46,10 @@ def _provider() -> tuple[str, ProviderRegistry]:
 
 def _schema_path() -> Path:
     return Path(__file__).resolve().parent / "schemas" / "user_profile.schema.json"
+
+
+def _proposal_schema_path() -> Path:
+    return Path(__file__).resolve().parent / "schemas" / "research_proposal.schema.json"
 
 
 @profile_app.command("init")
@@ -127,20 +140,27 @@ def papers_search(
         help="Search query (or local path for local_pdf)",
     ),
     limit: int = typer.Option(5, "--limit", "-l", help="Max results"),
+    no_save: bool = typer.Option(False, "--no-save", help="Do not write metadata JSON"),
 ) -> None:
     """
-    Search papers using configured provider.
+    Search papers using configured provider; writes metadata under data/papers/metadata/.
     """
 
     provider_name, reg = _provider()
     p = reg.get(provider_name)
     refs = p.search(query=query, limit=limit)
+    paths = get_paths()
     typer.echo(json.dumps([r.__dict__ for r in refs], ensure_ascii=False, indent=2))
+    if not no_save:
+        meta_path = write_search_record(
+            paths, provider=provider_name, query=query, refs=refs
+        )
+        typer.echo(f"Wrote metadata: {meta_path}", err=True)
 
 
 @papers_app.command("fetch")
 def papers_fetch(
-    source: str = typer.Option(..., "--source", help="Source name (arxiv/local_pdf)"),
+    source: str = typer.Option(..., "--source", help="Source name (arxiv/local_pdf/aminer)"),
     pid: str = typer.Option(..., "--id", help="Paper id (arXiv id or file stem)"),
     title: str | None = typer.Option(None, "--title", help="Optional title"),
     pdf_url: str | None = typer.Option(None, "--pdf-url", help="Optional pdf url or local path"),
@@ -152,8 +172,174 @@ def papers_fetch(
     reg = ProviderRegistry.default()
     p = reg.get(source)
     paths = get_paths()
-    dest_dir = paths.data_dir / "papers" / "pdfs"
+    dest_dir = paths.papers_pdfs_dir
     ref = PaperRef(source=source, id=pid, title=title, pdf_url=pdf_url)
     out = p.fetch_pdf(ref=ref, dest_dir=dest_dir)
+    meta_path = write_fetch_record(
+        paths,
+        source=source,
+        paper_id=pid,
+        title=title,
+        pdf_path=out,
+    )
+    typer.echo(str(out))
+    typer.echo(f"Wrote metadata: {meta_path}", err=True)
+
+
+@papers_app.command("parse")
+def papers_parse(
+    input: Path = typer.Option(
+        ...,
+        "--input",
+        "-i",
+        exists=True,
+        dir_okay=False,
+        help="PDF file path",
+    ),
+    output: Path | None = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Output text path (default: data/papers/parsed/<stem>.txt)",
+    ),
+) -> None:
+    """
+    Extract text from PDF into data/papers/parsed/ (uses pypdf).
+    """
+
+    paths = get_paths()
+    paths.papers_parsed_dir.mkdir(parents=True, exist_ok=True)
+    out = output or (paths.papers_parsed_dir / f"{input.stem}.txt")
+    text = extract_pdf_text(input)
+    out.write_text(text + "\n", encoding="utf-8")
     typer.echo(str(out))
 
+
+@phase1_app.command("run")
+def phase1_run(
+    profile: Path = typer.Option(
+        ...,
+        "--profile",
+        "-p",
+        exists=True,
+        dir_okay=False,
+        help="Validated user profile JSON",
+    ),
+    limit: int = typer.Option(3, "--limit", "-l", help="Search result count"),
+    fetch_first: bool = typer.Option(
+        False,
+        "--fetch-first",
+        help="Fetch PDF for the first search hit",
+    ),
+) -> None:
+    """
+    Load profile → build query from keywords/problem_statements → search → optional fetch #1.
+    """
+
+    schema_path = _schema_path()
+    data = load_profile_from_json(profile)
+    validate_profile(profile=data, schema=load_schema(schema_path))
+
+    keywords = list(data.get("research_intent", {}).get("keywords") or [])
+    problems = list(data.get("research_intent", {}).get("problem_statements") or [])
+    if keywords:
+        query = " ".join(str(k) for k in keywords[:8])
+    elif problems:
+        query = str(problems[0])
+    else:
+        query = "machine learning"
+
+    provider_name, reg = _provider()
+    prov = reg.get(provider_name)
+    paths = get_paths()
+    refs = prov.search(query=query, limit=limit)
+    meta = write_search_record(paths, provider=provider_name, query=query, refs=refs)
+    typer.echo(json.dumps({"metadata_file": str(meta), "count": len(refs)}, indent=2))
+
+    if fetch_first and refs:
+        r0 = refs[0]
+        pdf_path = prov.fetch_pdf(ref=r0, dest_dir=paths.papers_pdfs_dir)
+        fmeta = write_fetch_record(
+            paths,
+            source=r0.source,
+            paper_id=r0.id,
+            title=r0.title,
+            pdf_path=pdf_path,
+        )
+        typer.echo(json.dumps({"pdf": str(pdf_path), "fetch_metadata": str(fmeta)}, indent=2))
+
+
+@proposal_app.command("draft")
+def proposal_draft(
+    profile: Path = typer.Option(
+        ...,
+        "--profile",
+        "-p",
+        exists=True,
+        dir_okay=False,
+    ),
+    corpus: Path | None = typer.Option(
+        None,
+        "--corpus",
+        "-c",
+        exists=True,
+        dir_okay=False,
+        help="Optional latest search metadata JSON under data/papers/metadata/",
+    ),
+    title: str = typer.Option("Research direction", "--title", "-t"),
+) -> None:
+    """
+    Stub debate + write draft proposal JSON under data/proposals/.
+    """
+
+    schema_path = _schema_path()
+    prof = load_profile_from_json(profile)
+    validate_profile(profile=prof, schema=load_schema(schema_path))
+    prof_summary = json.dumps(
+        prof.get("research_intent", {}),
+        ensure_ascii=False,
+    )[:1200]
+
+    corpus_summary = ""
+    if corpus:
+        corpus_summary = corpus.read_text(encoding="utf-8")[:2000]
+
+    debate = run_debate_stub(profile_summary=prof_summary, corpus_summary=corpus_summary)
+    proposal = merge_stub_to_proposal(title=title, debate=debate, status="draft")
+
+    prop_schema = load_schema(_proposal_schema_path())
+    validate_profile(profile=proposal, schema=prop_schema)
+
+    paths = get_paths()
+    paths.proposals_dir.mkdir(parents=True, exist_ok=True)
+    out = paths.proposals_dir / "proposal-draft.json"
+    out.write_text(json.dumps(proposal, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    typer.echo(str(out))
+
+
+@proposal_app.command("confirm")
+def proposal_confirm(
+    input: Path = typer.Option(
+        ...,
+        "--input",
+        "-i",
+        exists=True,
+        dir_okay=False,
+        help="Draft proposal JSON",
+    ),
+) -> None:
+    """
+    Validate proposal schema and mark status confirmed; writes proposal-confirmed.json.
+    """
+
+    raw = json.loads(input.read_text(encoding="utf-8"))
+    prop_schema = load_schema(_proposal_schema_path())
+    validate_profile(profile=raw, schema=prop_schema)
+    raw["status"] = "confirmed"
+    validate_profile(profile=raw, schema=prop_schema)
+
+    paths = get_paths()
+    paths.proposals_dir.mkdir(parents=True, exist_ok=True)
+    out = paths.proposals_dir / "proposal-confirmed.json"
+    out.write_text(json.dumps(raw, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    typer.echo(str(out))

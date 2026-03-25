@@ -54,17 +54,35 @@ Phase 4: 防幻觉论文编撰
 
 ## 快速开始
 
+推荐使用 **uv** 与统一 CLI `autopapers`：
+
 ```bash
-# 克隆仓库
 git clone https://github.com/yyleave/AutoPapers.git
 cd AutoPapers
 
-# 安装依赖 (待实现)
-pip install -r requirements.txt
+uv sync
 
-# 运行 (待实现)
-python main.py
+# Phase 1：用户画像
+uv run autopapers profile init -o user_profile.json
+uv run autopapers profile validate -i user_profile.json
+
+# 文献检索（默认 provider 可由环境变量 AUTOPAPERS_PROVIDER 设置：arxiv / local_pdf / aminer）
+uv run autopapers papers search -q "transformer" -l 3
+
+# Phase 1 一键：profile → 搜索 →（可选）拉取首篇 PDF
+uv run autopapers phase1 run --profile user_profile.json --fetch-first
+
+# PDF 转文本（需依赖已安装）
+uv run autopapers papers parse -i ./data/papers/pdfs/some.pdf
+
+# Phase 2 占位：生成/确认 proposal
+uv run autopapers proposal draft --profile user_profile.json
+uv run autopapers proposal confirm -i ./data/proposals/proposal-draft.json
 ```
+
+**Legacy**：`src/paper_fetcher.py` 与 `src/api/` 为早期脚本，仍以 `python src/paper_fetcher.py` 等方式可用，但新开发请以 `autopapers` 为准。
+
+另可按仓库内 `requirements.txt` 使用 `pip`（与 uv 二选一即可）。
 
 ## 贡献
 

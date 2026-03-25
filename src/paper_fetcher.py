@@ -1,7 +1,9 @@
 """
-论文获取工具
+论文获取工具（Legacy）
 
 整合 AMiner API（获取元数据）+ PDFDownloader（自动下载全文）
+
+对外推荐入口：`uv run autopapers`（见 README）。本模块保留用于迁移与对照。
 """
 
 import os

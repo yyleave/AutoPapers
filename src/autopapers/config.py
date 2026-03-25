@@ -13,6 +13,11 @@ class Paths:
     runs_dir: Path
     artifacts_dir: Path
     profiles_dir: Path
+    papers_dir: Path
+    papers_metadata_dir: Path
+    papers_pdfs_dir: Path
+    papers_parsed_dir: Path
+    proposals_dir: Path
 
 
 def get_paths(*, repo_root: Path | None = None) -> Paths:
@@ -28,6 +33,11 @@ def get_paths(*, repo_root: Path | None = None) -> Paths:
     runs_dir = data_dir / "runs"
     artifacts_dir = data_dir / "artifacts"
     profiles_dir = data_dir / "profiles"
+    papers_dir = data_dir / "papers"
+    papers_metadata_dir = papers_dir / "metadata"
+    papers_pdfs_dir = papers_dir / "pdfs"
+    papers_parsed_dir = papers_dir / "parsed"
+    proposals_dir = data_dir / "proposals"
     return Paths(
         repo_root=root,
         data_dir=data_dir,
@@ -35,6 +45,11 @@ def get_paths(*, repo_root: Path | None = None) -> Paths:
         runs_dir=runs_dir,
         artifacts_dir=artifacts_dir,
         profiles_dir=profiles_dir,
+        papers_dir=papers_dir,
+        papers_metadata_dir=papers_metadata_dir,
+        papers_pdfs_dir=papers_pdfs_dir,
+        papers_parsed_dir=papers_parsed_dir,
+        proposals_dir=proposals_dir,
     )
 
 

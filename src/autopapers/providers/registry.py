@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from autopapers.providers.aminer_provider import AminerProvider
 from autopapers.providers.arxiv_provider import ArxivProvider
 from autopapers.providers.base import Provider
 from autopapers.providers.local_pdf_provider import LocalPdfProvider
@@ -16,6 +17,7 @@ class ProviderRegistry:
         providers: dict[str, Provider] = {
             "arxiv": ArxivProvider(),
             "local_pdf": LocalPdfProvider(),
+            "aminer": AminerProvider(),
         }
         return cls(providers=providers)
 

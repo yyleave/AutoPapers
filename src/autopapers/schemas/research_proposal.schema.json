@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/autopapers/schemas/research_proposal.schema.json",
+  "title": "Research Proposal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "title", "problem", "hypothesis", "risks", "status"],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "title": { "type": "string" },
+    "problem": { "type": "string" },
+    "hypothesis": { "type": "string" },
+    "contributions": { "type": "array", "items": { "type": "string" } },
+    "baselines": { "type": "array", "items": { "type": "string" } },
+    "risks": { "type": "array", "items": { "type": "string" } },
+    "resources": { "type": "array", "items": { "type": "string" } },
+    "debate_notes": { "type": "object" },
+    "status": { "type": "string", "enum": ["draft", "confirmed"] }
+  }
+}
