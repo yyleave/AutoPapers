@@ -27,6 +27,25 @@ def test_arxiv_fetch_pdf_requires_pdf_url(tmp_path: Path) -> None:
         ArxivProvider().fetch_pdf(ref=ref, dest_dir=tmp_path)
 
 
+@patch("autopapers.providers.arxiv_provider.urllib.request.urlopen")
+def test_arxiv_fetch_pdf_writes_response_bytes(mock_urlopen: MagicMock, tmp_path: Path) -> None:
+    ref = PaperRef(
+        source="arxiv",
+        id="2501.00001",
+        title="T",
+        pdf_url="https://arxiv.org/pdf/2501.00001.pdf",
+    )
+    resp = MagicMock()
+    resp.__enter__.return_value.read.return_value = b"%PDF-1.4 fake"
+    resp.__exit__.return_value = None
+    mock_urlopen.return_value = resp
+    dest = tmp_path / "pdfs"
+    out = ArxivProvider().fetch_pdf(ref=ref, dest_dir=dest)
+    assert out == dest / "2501.00001.pdf"
+    assert out.read_bytes() == b"%PDF-1.4 fake"
+    mock_urlopen.assert_called_once()
+
+
 def test_arxiv_id_from_entry_abs_url() -> None:
     assert (
         _arxiv_id_from_entry_id("http://arxiv.org/abs/2501.01234v1") == "2501.01234v1"

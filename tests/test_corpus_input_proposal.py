@@ -6,6 +6,7 @@ from pathlib import Path
 from autopapers.config import get_paths
 from autopapers.phase2.corpus_input import (
     DEFAULT_SNAPSHOT,
+    MAX_CHARS,
     format_snapshot_for_proposal,
     load_corpus_text_for_proposal,
 )
@@ -71,6 +72,31 @@ def test_format_snapshot_non_list_nodes_uses_json_snippet() -> None:
     out = format_snapshot_for_proposal({"schema_version": "0.1", "nodes": "not-list"})
     assert "0.1" in out
     assert "not-list" in out or '"not-list"' in out
+
+
+def test_format_snapshot_respects_max_chars() -> None:
+    nodes = [
+        {
+            "id": f"paper:n:{i}",
+            "type": "Paper",
+            "label": f"Title-{i}",
+            "source": "n",
+            "external_id": str(i),
+        }
+        for i in range(50)
+    ]
+    data = {"schema_version": "0.1", "nodes": nodes, "edges": []}
+    out = format_snapshot_for_proposal(data, max_chars=180)
+    assert len(out) == 180
+
+
+def test_explicit_corpus_invalid_json_returns_truncated_text(tmp_path: Path) -> None:
+    paths = get_paths(repo_root=tmp_path)
+    bad = tmp_path / "broken.json"
+    bad.write_text("not json {{{{ " + "x" * 50_000, encoding="utf-8")
+    text, used = load_corpus_text_for_proposal(paths, bad)
+    assert used == bad
+    assert len(text) == MAX_CHARS
 
 
 def test_format_snapshot_lists_papers(tmp_path: Path) -> None:
