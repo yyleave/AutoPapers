@@ -58,6 +58,12 @@ def test_snapshot_includes_text_extract_snippets(tmp_path: Path) -> None:
     assert "Abstract: hello world" in text
 
 
+def test_format_snapshot_non_list_nodes_uses_json_snippet() -> None:
+    out = format_snapshot_for_proposal({"schema_version": "0.1", "nodes": "not-list"})
+    assert "0.1" in out
+    assert "not-list" in out or '"not-list"' in out
+
+
 def test_format_snapshot_lists_papers(tmp_path: Path) -> None:
     data = {
         "schema_version": "0.1",

@@ -73,6 +73,17 @@ def test_proposal_draft_cli_writes_json(tmp_path: Path, monkeypatch: pytest.Monk
     assert data["status"] == "draft"
 
 
+def test_proposal_export_cli_rejects_invalid_json(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    bad = tmp_path / "not-json.json"
+    bad.write_text("{", encoding="utf-8")
+    r = CliRunner().invoke(app, ["proposal", "export", "-i", str(bad)])
+    assert r.exit_code != 0
+
+
 def test_proposal_export_default_writes_beside_json(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

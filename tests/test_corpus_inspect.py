@@ -281,6 +281,13 @@ def test_load_corpus_snapshot_not_object(tmp_path: Path) -> None:
         load_corpus_snapshot_document(p)
 
 
+def test_load_corpus_snapshot_invalid_json_raises(tmp_path: Path) -> None:
+    p = tmp_path / "broken.json"
+    p.write_text("{", encoding="utf-8")
+    with pytest.raises(json.JSONDecodeError):
+        load_corpus_snapshot_document(p)
+
+
 def test_corpus_export_edges_missing_default_snapshot_exits(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
