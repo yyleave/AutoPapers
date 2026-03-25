@@ -20,6 +20,34 @@ def test_profile_init_writes_template(tmp_path: Path, monkeypatch: pytest.Monkey
     assert data["hardware"]["device"] == "mac"
 
 
+def test_profile_show_cli_rejects_invalid_profile(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    bad = tmp_path / "bad-show.json"
+    bad.write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "user": {"languages": []},
+                "background": {"domains": [], "skills": [], "constraints": []},
+                "hardware": {"device": "mac"},
+                "research_intent": {
+                    "problem_statements": [],
+                    "keywords": [],
+                    "non_goals": [],
+                    "risk_tolerance": "medium",
+                },
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    r = CliRunner().invoke(app, ["profile", "show", "-i", str(bad)])
+    assert r.exit_code != 0
+
+
 def test_profile_validate_cli_rejects_invalid_profile(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

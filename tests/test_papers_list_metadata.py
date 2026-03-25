@@ -10,6 +10,20 @@ from typer.testing import CliRunner
 from autopapers.cli import app
 
 
+def test_list_metadata_limit_zero_returns_no_files(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    meta = tmp_path / "data" / "papers" / "metadata"
+    meta.mkdir(parents=True)
+    (meta / "a.json").write_text("{}", encoding="utf-8")
+    r = CliRunner().invoke(app, ["papers", "list-metadata", "--limit", "0"])
+    assert r.exit_code == 0
+    data = json.loads(r.stdout)
+    assert data["files"] == []
+
+
 def test_list_metadata_missing_dir_returns_empty_files(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
