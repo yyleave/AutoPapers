@@ -11,7 +11,11 @@ import typer
 from autopapers import __version__ as autopapers_version
 from autopapers.config import get_paths, load_config
 from autopapers.logging_utils import setup_logging
-from autopapers.phase1.corpus_inspect import summarize_corpus_snapshot
+from autopapers.phase1.corpus_inspect import (
+    load_corpus_snapshot_document,
+    snapshot_edges_to_csv,
+    summarize_corpus_snapshot,
+)
 from autopapers.phase1.corpus_snapshot import build_corpus_snapshot, write_corpus_snapshot
 from autopapers.phase1.papers.metadata_pick import MetadataKind, newest_papers_metadata
 from autopapers.phase1.papers.parse_pdf import extract_and_save_txt
@@ -579,7 +583,7 @@ def corpus_info(
         )
         raise typer.Exit(code=1)
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = load_corpus_snapshot_document(path)
     except json.JSONDecodeError as e:
         typer.echo(
             json.dumps(
@@ -589,15 +593,78 @@ def corpus_info(
             err=True,
         )
         raise typer.Exit(code=1) from e
-    if not isinstance(data, dict):
+    except TypeError as e:
         typer.echo(
-            json.dumps({"error": "expected_object", "path": str(path.resolve())}, indent=2),
+            json.dumps(
+                {"error": "expected_object", "path": str(path.resolve()), "detail": str(e)},
+                indent=2,
+            ),
             err=True,
         )
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
     summary = summarize_corpus_snapshot(data)
     summary["snapshot"] = str(path.resolve())
     typer.echo(json.dumps(summary, ensure_ascii=False, indent=2))
+
+
+@corpus_app.command("export-edges")
+def corpus_export_edges(
+    snapshot: Path | None = typer.Option(
+        None,
+        "--snapshot",
+        "-s",
+        exists=True,
+        dir_okay=False,
+        help="Snapshot JSON (default: data/kg/corpus-snapshot.json)",
+    ),
+    output: Path | None = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Write CSV here (default: print to stdout)",
+    ),
+) -> None:
+    """Export graph edges from a corpus snapshot as CSV (source,target,relation)."""
+
+    paths = get_paths()
+    path = snapshot or (paths.kg_dir / "corpus-snapshot.json")
+    if not path.is_file():
+        typer.echo(
+            json.dumps(
+                {"error": "snapshot_not_found", "path": str(path.resolve())},
+                indent=2,
+            ),
+            err=True,
+        )
+        raise typer.Exit(code=1)
+    try:
+        data = load_corpus_snapshot_document(path)
+    except json.JSONDecodeError as e:
+        typer.echo(
+            json.dumps(
+                {"error": "invalid_json", "path": str(path.resolve()), "detail": str(e)},
+                indent=2,
+            ),
+            err=True,
+        )
+        raise typer.Exit(code=1) from e
+    except TypeError as e:
+        typer.echo(
+            json.dumps(
+                {"error": "expected_object", "path": str(path.resolve()), "detail": str(e)},
+                indent=2,
+            ),
+            err=True,
+        )
+        raise typer.Exit(code=1) from e
+
+    csv_text = snapshot_edges_to_csv(data)
+    if output is not None:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(csv_text, encoding="utf-8")
+        typer.echo(str(output.resolve()))
+    else:
+        typer.echo(csv_text.rstrip("\n"))
 
 
 @proposal_app.command("draft")
@@ -721,6 +788,12 @@ def proposal_confirm(
         dir_okay=False,
         help="Draft proposal JSON",
     ),
+    output: Path | None = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Confirmed JSON path (default: data/proposals/proposal-confirmed.json)",
+    ),
 ) -> None:
     """
     Validate proposal schema and mark status confirmed; writes proposal-confirmed.json.
@@ -734,7 +807,8 @@ def proposal_confirm(
 
     paths = get_paths()
     paths.proposals_dir.mkdir(parents=True, exist_ok=True)
-    out = paths.proposals_dir / "proposal-confirmed.json"
+    out = output or (paths.proposals_dir / "proposal-confirmed.json")
+    out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(raw, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     typer.echo(str(out))
 

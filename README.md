@@ -103,11 +103,15 @@ uv run autopapers corpus build --profile user_profile.json
 # 查看当前快照的节点类型 / 边类型统计（不重新 build）
 uv run autopapers corpus info
 
+# 将快照中的边导出为 CSV（默认打印；可用 -o 写入文件）
+uv run autopapers corpus export-edges
+
 # Phase 2 占位：生成/确认 proposal（未指定 --corpus 时会自动用 data/kg/corpus-snapshot.json）
 uv run autopapers proposal draft --profile user_profile.json
 # uv run autopapers proposal draft --profile user_profile.json -o ./my-draft.json
 uv run autopapers proposal validate -i ./data/proposals/proposal-draft.json
 uv run autopapers proposal confirm -i ./data/proposals/proposal-draft.json
+# uv run autopapers proposal confirm -i ./draft.json -o ./confirmed.json
 
 # 将 proposal JSON 导出为 Markdown（默认与输入同名的 .md）
 uv run autopapers proposal export -i ./data/proposals/proposal-draft.json
