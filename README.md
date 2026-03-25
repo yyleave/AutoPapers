@@ -68,6 +68,9 @@ uv run autopapers status
 # 版本号（与 pyproject 版本一致，需可编辑/安装包）
 uv run autopapers version
 
+# 当前生效的 provider / 日志级别、default.toml 路径、数据根目录等（JSON）
+uv run autopapers config
+
 # 若当前工作目录不是仓库根目录，可指定仓库根：./data 与 configs/default.toml 均相对该路径
 # export AUTOPAPERS_REPO_ROOT="/path/to/AutoPapers"
 

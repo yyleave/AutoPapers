@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
@@ -9,7 +10,7 @@ from typing import Any, cast
 import typer
 
 from autopapers import __version__ as autopapers_version
-from autopapers.config import Paths, get_paths, load_config
+from autopapers.config import Paths, default_toml_path, get_paths, load_config
 from autopapers.logging_utils import setup_logging
 from autopapers.phase1.corpus_inspect import (
     load_corpus_snapshot_document,
@@ -133,6 +134,38 @@ def cmd_version() -> None:
     """Print package version."""
 
     typer.echo(autopapers_version)
+
+
+@app.command("config")
+def cmd_config() -> None:
+    """Print effective provider/log settings, TOML path, and data repo root (JSON)."""
+
+    cfg = load_config()
+    toml = default_toml_path()
+    paths = get_paths()
+    typer.echo(
+        json.dumps(
+            {
+                "app_version": autopapers_version,
+                "effective": {
+                    "provider": cfg.provider,
+                    "log_level": cfg.log_level,
+                },
+                "env_override": {
+                    "AUTOPAPERS_PROVIDER": os.environ.get("AUTOPAPERS_PROVIDER") is not None,
+                    "AUTOPAPERS_LOG_LEVEL": os.environ.get("AUTOPAPERS_LOG_LEVEL") is not None,
+                    "AUTOPAPERS_REPO_ROOT": bool(
+                        os.environ.get("AUTOPAPERS_REPO_ROOT", "").strip()
+                    ),
+                },
+                "default_toml_path": str(toml),
+                "default_toml_present": toml.is_file(),
+                "data_repo_root": str(paths.repo_root.resolve()),
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
 
 
 @profile_app.command("init")
