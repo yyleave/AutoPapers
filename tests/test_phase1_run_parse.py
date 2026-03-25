@@ -400,6 +400,56 @@ def test_phase1_run_arxiv_mocked_writes_search_metadata(
     mock_search.assert_called_once_with(query="attention mechanism", limit=3)
 
 
+@patch.object(OpenAlexProvider, "search")
+def test_phase1_run_uses_problem_statement_when_keywords_empty(
+    mock_search: MagicMock,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Non-dry-run: query falls back to first problem_statements when keywords are empty."""
+    monkeypatch.chdir(tmp_path)
+    mock_search.return_value = [
+        PaperRef(
+            source="openalex",
+            id="W42",
+            title="From problem statement",
+            pdf_url=None,
+        ),
+    ]
+    query_text = "causal inference under distribution shift"
+    prof = tmp_path / "p.json"
+    prof.write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "user": {"languages": ["en"]},
+                "background": {"domains": [], "skills": [], "constraints": []},
+                "hardware": {"device": "other"},
+                "research_intent": {
+                    "problem_statements": [query_text],
+                    "keywords": [],
+                    "non_goals": [],
+                    "risk_tolerance": "medium",
+                },
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    r = CliRunner().invoke(
+        app,
+        ["phase1", "run", "--profile", str(prof), "--limit", "5"],
+        env={"AUTOPAPERS_PROVIDER": "openalex"},
+    )
+    assert r.exit_code == 0, r.stdout + r.stderr
+    summary = json.loads(r.stdout)
+    assert summary["count"] == 1
+    meta = Path(summary["metadata_file"])
+    row = json.loads(meta.read_text(encoding="utf-8"))
+    assert row["query"] == query_text
+    mock_search.assert_called_once_with(query=query_text, limit=5)
+
+
 def test_phase1_parse_fetched_requires_fetch_first(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
