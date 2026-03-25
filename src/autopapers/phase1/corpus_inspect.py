@@ -75,8 +75,11 @@ def snapshot_edges_to_csv(data: dict[str, Any]) -> str:
     return buf.getvalue()
 
 
-def snapshot_nodes_to_csv(data: dict[str, Any]) -> str:
-    """Serialize snapshot ``nodes`` to CSV (header: id,type,label)."""
+def snapshot_nodes_to_csv(data: dict[str, Any], *, type_filter: str | None = None) -> str:
+    """Serialize snapshot ``nodes`` to CSV (header: id,type,label).
+
+    If ``type_filter`` is set, only nodes whose ``type`` matches (string equality) are included.
+    """
 
     nodes_raw = data.get("nodes")
     nodes = nodes_raw if isinstance(nodes_raw, list) else []
@@ -88,6 +91,8 @@ def snapshot_nodes_to_csv(data: dict[str, Any]) -> str:
             continue
         nid = n.get("id", "")
         typ = n.get("type", "")
+        if type_filter is not None and str(typ) != type_filter:
+            continue
         lab = n.get("label")
         if lab is None:
             lab_s = ""

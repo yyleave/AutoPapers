@@ -753,12 +753,18 @@ def corpus_export_nodes(
         "-o",
         help="Write CSV here (default: print to stdout)",
     ),
+    node_type: str | None = typer.Option(
+        None,
+        "--type",
+        "-t",
+        help="Only nodes with this type (e.g. Paper, TextExtract)",
+    ),
 ) -> None:
     """Export graph nodes from a corpus snapshot as CSV (id,type,label)."""
 
     paths = get_paths()
     _, data = _load_corpus_snapshot_for_cli(paths, snapshot)
-    csv_text = snapshot_nodes_to_csv(data)
+    csv_text = snapshot_nodes_to_csv(data, type_filter=node_type)
     if output is not None:
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(csv_text, encoding="utf-8")

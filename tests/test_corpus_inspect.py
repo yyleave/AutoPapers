@@ -84,6 +84,20 @@ def test_snapshot_nodes_to_csv_rows() -> None:
     assert "n1,Paper,Title" in lines
 
 
+def test_snapshot_nodes_to_csv_type_filter() -> None:
+    data = {
+        "nodes": [
+            {"id": "a", "type": "Paper", "label": "X"},
+            {"id": "b", "type": "User", "label": "u"},
+        ]
+    }
+    csv = snapshot_nodes_to_csv(data, type_filter="Paper")
+    lines = csv.strip().split("\n")
+    assert len(lines) == 2
+    assert "Paper" in lines[1]
+    assert "User" not in csv
+
+
 def test_snapshot_edges_to_csv_rows() -> None:
     data = {"edges": [{"source": "x", "target": "y", "relation": "R"}]}
     csv = snapshot_edges_to_csv(data)
@@ -119,6 +133,34 @@ def test_corpus_export_edges_cli(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     r = CliRunner().invoke(app, ["corpus", "export-edges"])
     assert r.exit_code == 0
     assert "FETCHED" in r.stdout
+
+
+def test_corpus_export_nodes_type_filter_cli(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    kg = tmp_path / "data" / "kg"
+    kg.mkdir(parents=True)
+    snap = kg / "corpus-snapshot.json"
+    snap.write_text(
+        json.dumps(
+            {
+                "nodes": [
+                    {"id": "x", "type": "Paper", "label": "L"},
+                    {"id": "y", "type": "Fetch", "label": "f"},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    r = CliRunner().invoke(
+        app,
+        ["corpus", "export-nodes", "-t", "Paper"],
+    )
+    assert r.exit_code == 0
+    assert "Paper" in r.stdout
+    assert "Fetch" not in r.stdout
 
 
 def test_corpus_export_nodes_cli(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
