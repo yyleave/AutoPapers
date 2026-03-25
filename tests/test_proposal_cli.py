@@ -73,6 +73,25 @@ def test_proposal_draft_cli_writes_json(tmp_path: Path, monkeypatch: pytest.Monk
     assert data["status"] == "draft"
 
 
+def test_proposal_export_default_writes_beside_json(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    prof = tmp_path / "user.json"
+    assert CliRunner().invoke(app, ["profile", "init", "-o", str(prof)]).exit_code == 0
+    assert (
+        CliRunner().invoke(app, ["proposal", "draft", "--profile", str(prof), "-t", "Md"]).exit_code
+        == 0
+    )
+    draft = tmp_path / "data" / "proposals" / "proposal-draft.json"
+    r = CliRunner().invoke(app, ["proposal", "export", "-i", str(draft)])
+    assert r.exit_code == 0
+    md = draft.with_suffix(".md")
+    assert md.is_file()
+    assert r.stdout.strip() == str(md.resolve())
+
+
 def test_proposal_confirm_and_export_markdown(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

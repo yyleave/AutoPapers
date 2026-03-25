@@ -152,3 +152,31 @@ def test_papers_parse_batch_write_manifest_per_file(
     assert (parsed / "solo.txt").is_file()
     assert (parsed / "solo.manifest.json").is_file()
     assert "manifest:" in (r.stderr or "").lower()
+
+
+def test_papers_parse_batch_continues_after_bad_pdf(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    indir = tmp_path / "mixed_pdfs"
+    indir.mkdir(parents=True)
+    _tiny_pdf(indir / "good.pdf")
+    (indir / "bad.pdf").write_bytes(b"not-a-pdf")
+    r = CliRunner().invoke(
+        app,
+        [
+            "papers",
+            "parse-batch",
+            "--input-dir",
+            str(indir),
+            "--max-pages",
+            "1",
+        ],
+    )
+    assert r.exit_code == 0
+    err = r.stderr.strip()
+    summary = json.loads(err[err.index("{") :])
+    assert summary["parsed"] == 1
+    assert len(summary["errors"]) == 1
+    assert "bad.pdf" in summary["errors"][0]
