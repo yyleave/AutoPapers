@@ -93,6 +93,45 @@ def test_corpus_info_cli(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
     assert "Paper" in out["nodes_by_type"]
 
 
+def test_corpus_info_reflects_manifest_only_snapshot(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    parsed = tmp_path / "data" / "papers" / "parsed"
+    parsed.mkdir(parents=True)
+    pdf = tmp_path / "data" / "papers" / "pdfs" / "info-only.pdf"
+    pdf.parent.mkdir(parents=True)
+    pdf.write_bytes(b"%PDF-info")
+    txt = parsed / "info-only.txt"
+    txt.write_text("body", encoding="utf-8")
+    (parsed / "info-only.manifest.json").write_text(
+        json.dumps(
+            {
+                "type": "parse",
+                "created_at": "2026-03-15T00:00:00Z",
+                "input_pdf": str(pdf.resolve()),
+                "output_txt": str(txt.resolve()),
+                "char_count": 4,
+                "pages_total": 1,
+                "pages_read": 1,
+                "max_pages": None,
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    assert CliRunner().invoke(app, ["corpus", "build"]).exit_code == 0
+    r = CliRunner().invoke(app, ["corpus", "info"])
+    assert r.exit_code == 0
+    out = json.loads(r.stdout)
+    assert out["node_total"] == 1
+    assert out["nodes_by_type"].get("TextExtract") == 1
+    snap_path = tmp_path / "data" / "kg" / "corpus-snapshot.json"
+    assert Path(out["snapshot"]).resolve() == snap_path.resolve()
+
+
 def test_corpus_build_dry_run_includes_profile_in_summary(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
