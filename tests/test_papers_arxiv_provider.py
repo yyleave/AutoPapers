@@ -2,7 +2,14 @@ from __future__ import annotations
 
 import pytest
 
-from autopapers.providers.arxiv_provider import ArxivProvider
+from autopapers.providers.arxiv_provider import ArxivProvider, _arxiv_id_from_entry_id
+
+
+def test_arxiv_id_from_entry_abs_url() -> None:
+    assert (
+        _arxiv_id_from_entry_id("http://arxiv.org/abs/2501.01234v1") == "2501.01234v1"
+    )
+    assert _arxiv_id_from_entry_id("not-a-url") == "not-a-url"
 
 
 @pytest.mark.network

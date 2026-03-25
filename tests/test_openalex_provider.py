@@ -3,7 +3,11 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock, patch
 
-from autopapers.providers.openalex_provider import OpenAlexProvider
+from autopapers.providers.openalex_provider import (
+    OpenAlexProvider,
+    _openalex_short_id,
+    _pick_pdf_url,
+)
 
 
 @patch("autopapers.providers.openalex_provider.urllib.request.urlopen")
@@ -29,3 +33,37 @@ def test_openalex_search_parses_results(mock_urlopen: MagicMock) -> None:
     assert refs[0].source == "openalex"
     assert refs[0].title == "Example Paper"
     assert refs[0].pdf_url == "https://example.org/paper.pdf"
+
+
+def test_openalex_short_id_from_url() -> None:
+    assert _openalex_short_id("") == ""
+    assert _openalex_short_id("https://openalex.org/W123") == "W123"
+    assert _openalex_short_id("https://openalex.org/W123/") == "W123"
+
+
+def test_openalex_pick_pdf_primary_over_best_oa() -> None:
+    w = {
+        "primary_location": {"pdf_url": "https://primary.pdf"},
+        "best_oa_location": {"pdf_url": "https://best.pdf"},
+    }
+    assert _pick_pdf_url(w) == "https://primary.pdf"
+
+
+def test_openalex_pick_pdf_content_urls_and_locations() -> None:
+    assert (
+        _pick_pdf_url({"content_urls": {"pdf_url": "https://cu.pdf"}}) == "https://cu.pdf"
+    )
+    loc_w = {"locations": [1, {"pdf_url": "https://loc.pdf"}]}
+    assert _pick_pdf_url(loc_w) == "https://loc.pdf"
+
+
+def test_openalex_pick_pdf_open_access_pdf_suffix_only() -> None:
+    assert (
+        _pick_pdf_url({"open_access": {"oa_url": "https://x.org/a.pdf"}})
+        == "https://x.org/a.pdf"
+    )
+    assert _pick_pdf_url({"open_access": {"oa_url": "https://x.org/html"}}) is None
+
+
+def test_openalex_pick_pdf_empty() -> None:
+    assert _pick_pdf_url({}) is None
