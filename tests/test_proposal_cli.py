@@ -9,6 +9,34 @@ from typer.testing import CliRunner
 from autopapers.cli import app
 
 
+def test_proposal_draft_cli_rejects_invalid_profile(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    bad = tmp_path / "bad-user.json"
+    bad.write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "user": {"languages": []},
+                "background": {"domains": [], "skills": [], "constraints": []},
+                "hardware": {"device": "mac"},
+                "research_intent": {
+                    "problem_statements": [],
+                    "keywords": [],
+                    "non_goals": [],
+                    "risk_tolerance": "medium",
+                },
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    r = CliRunner().invoke(app, ["proposal", "draft", "--profile", str(bad)])
+    assert r.exit_code != 0
+
+
 def test_proposal_draft_with_explicit_corpus_file(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

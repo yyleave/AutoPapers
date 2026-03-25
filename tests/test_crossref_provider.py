@@ -15,6 +15,28 @@ from autopapers.providers.crossref_provider import (
 
 
 @patch("autopapers.providers.crossref_provider.urllib.request.urlopen")
+def test_crossref_search_skips_items_without_doi(mock_urlopen: MagicMock) -> None:
+    body = {
+        "message": {
+            "items": [
+                {"title": ["No identifier"]},
+                {
+                    "DOI": "10.1000/only",
+                    "title": ["Has DOI"],
+                },
+            ]
+        }
+    }
+    resp = MagicMock()
+    resp.__enter__.return_value.read.return_value = json.dumps(body).encode("utf-8")
+    resp.__exit__.return_value = None
+    mock_urlopen.return_value = resp
+    refs = CrossrefProvider().search(query="q", limit=10)
+    assert len(refs) == 1
+    assert refs[0].id == "10.1000/only"
+
+
+@patch("autopapers.providers.crossref_provider.urllib.request.urlopen")
 def test_crossref_search_empty_items(mock_urlopen: MagicMock) -> None:
     body = {"message": {"items": []}}
     resp = MagicMock()

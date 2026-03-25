@@ -93,6 +93,49 @@ def test_corpus_info_cli(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
     assert "Paper" in out["nodes_by_type"]
 
 
+def test_corpus_build_dry_run_includes_profile_in_summary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    meta = tmp_path / "data" / "papers" / "metadata"
+    meta.mkdir(parents=True)
+    (meta / "one.json").write_text(
+        json.dumps(
+            {
+                "type": "search",
+                "created_at": "2026-01-01T00:00:00Z",
+                "provider": "arxiv",
+                "query": "q",
+                "results": [],
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    prof = tmp_path / "prof.json"
+    prof.write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "user": {"display_name": "DryRunUser"},
+                "research_intent": {"keywords": ["kw-dry"]},
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    r = CliRunner().invoke(
+        app,
+        ["corpus", "build", "--dry-run", "--profile", str(prof)],
+    )
+    assert r.exit_code == 0
+    out = json.loads(r.stdout)
+    assert out["dry_run"] is True
+    assert out["nodes_by_type"].get("User") == 1
+    assert out["nodes_by_type"].get("Keyword") == 1
+
+
 def test_corpus_build_dry_run_skips_write(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
     runner = CliRunner()
