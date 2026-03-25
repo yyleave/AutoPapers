@@ -551,6 +551,11 @@ def phase1_run(
         "--parse-max-pages",
         help="With --parse-fetched: max pages (0 = all)",
     ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Validate profile and print planned query/provider only (no search or writes)",
+    ),
 ) -> None:
     """
     Load profile → build query from keywords/problem_statements → search → optional fetch #1.
@@ -574,6 +579,25 @@ def phase1_run(
         query = "machine learning"
 
     provider_name, reg = _provider()
+    if dry_run:
+        typer.echo(
+            json.dumps(
+                {
+                    "dry_run": True,
+                    "profile": str(profile.resolve()),
+                    "query": query,
+                    "provider": provider_name,
+                    "limit": limit,
+                    "fetch_first": fetch_first,
+                    "parse_fetched": parse_fetched,
+                    "parse_max_pages": parse_max_pages,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        return
+
     prov = reg.get(provider_name)
     paths = get_paths()
     refs = prov.search(query=query, limit=limit)
@@ -597,9 +621,9 @@ def phase1_run(
         if parse_fetched:
             paths.papers_parsed_dir.mkdir(parents=True, exist_ok=True)
             out_txt = paths.papers_parsed_dir / f"{pdf_path.stem}.txt"
-            limit = None if parse_max_pages == 0 else parse_max_pages
+            page_limit = None if parse_max_pages == 0 else parse_max_pages
             text, pages_total, pages_read = extract_and_save_txt(
-                pdf_path, out_txt, max_pages=limit
+                pdf_path, out_txt, max_pages=page_limit
             )
             pmeta = write_parse_manifest(
                 pdf_path=pdf_path,

@@ -33,6 +33,42 @@ def _tiny_pdf(path: Path) -> None:
         writer.write(f)
 
 
+def test_phase1_dry_run_no_search(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    prof = tmp_path / "p.json"
+    prof.write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "user": {"languages": ["en"]},
+                "background": {"domains": [], "skills": [], "constraints": []},
+                "hardware": {"device": "other"},
+                "research_intent": {
+                    "problem_statements": [],
+                    "keywords": ["rl", "transformer"],
+                    "non_goals": [],
+                    "risk_tolerance": "medium",
+                },
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    runner = CliRunner()
+    r = runner.invoke(
+        app,
+        ["phase1", "run", "--profile", str(prof), "--dry-run", "--limit", "5"],
+        env={"AUTOPAPERS_PROVIDER": "arxiv"},
+    )
+    assert r.exit_code == 0
+    out = json.loads(r.stdout)
+    assert out["dry_run"] is True
+    assert "rl" in out["query"] and "transformer" in out["query"]
+    assert out["provider"] == "arxiv"
+    assert out["limit"] == 5
+    assert not (tmp_path / "data").exists()
+
+
 def test_phase1_parse_fetched_requires_fetch_first(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -91,6 +91,8 @@ uv run autopapers papers list-metadata
 uv run autopapers papers show-metadata --latest search
 
 # Phase 1 一键：profile → 搜索 →（可选）拉取首篇 PDF →（可选）转文本 + manifest
+# 仅校验 profile 并打印将使用的检索 query / provider（不写 metadata、不请求网络）
+# uv run autopapers phase1 run --profile user_profile.json --dry-run
 uv run autopapers phase1 run --profile user_profile.json --fetch-first --parse-fetched
 
 # PDF 转文本（需依赖已安装）；可选写入解析清单 JSON
