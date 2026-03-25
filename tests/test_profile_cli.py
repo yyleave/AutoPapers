@@ -85,6 +85,36 @@ def test_profile_validate_template_ok(tmp_path: Path, monkeypatch: pytest.Monkey
     assert r.stdout.strip() == "OK"
 
 
+def test_profile_save_cli_rejects_invalid_profile(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    bad = tmp_path / "bad-save.json"
+    bad.write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "user": {"languages": []},
+                "background": {"domains": [], "skills": [], "constraints": []},
+                "hardware": {"device": "mac"},
+                "research_intent": {
+                    "problem_statements": [],
+                    "keywords": [],
+                    "non_goals": [],
+                    "risk_tolerance": "medium",
+                },
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    r = CliRunner().invoke(app, ["profile", "save", "-i", str(bad)])
+    assert r.exit_code != 0
+    profiles_dir = tmp_path / "data" / "profiles"
+    assert (not profiles_dir.is_dir()) or not list(profiles_dir.glob("profile-*.json"))
+
+
 def test_profile_save_writes_under_data_profiles(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

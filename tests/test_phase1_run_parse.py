@@ -58,6 +58,41 @@ def test_phase1_run_search_only_writes_search_metadata(
     assert not pdfs_dir.is_dir() or not any(pdfs_dir.glob("*.pdf"))
 
 
+def test_phase1_dry_run_builds_query_from_problem_statement(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    prof = tmp_path / "p.json"
+    prof.write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "user": {"languages": ["en"]},
+                "background": {"domains": [], "skills": [], "constraints": []},
+                "hardware": {"device": "other"},
+                "research_intent": {
+                    "problem_statements": ["fairness in neural ranking"],
+                    "keywords": [],
+                    "non_goals": [],
+                    "risk_tolerance": "medium",
+                },
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    r = CliRunner().invoke(
+        app,
+        ["phase1", "run", "--profile", str(prof), "--dry-run"],
+        env={"AUTOPAPERS_PROVIDER": "arxiv"},
+    )
+    assert r.exit_code == 0
+    out = json.loads(r.stdout)
+    assert out["dry_run"] is True
+    assert "fairness" in out["query"]
+
+
 def test_phase1_dry_run_no_search(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
     prof = tmp_path / "p.json"
