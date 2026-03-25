@@ -80,7 +80,7 @@ uv run autopapers corpus build
 # 可选：把用户画像里的关键词并入图中
 uv run autopapers corpus build --profile user_profile.json
 
-# Phase 2 占位：生成/确认 proposal
+# Phase 2 占位：生成/确认 proposal（未指定 --corpus 时会自动用 data/kg/corpus-snapshot.json）
 uv run autopapers proposal draft --profile user_profile.json
 uv run autopapers proposal confirm -i ./data/proposals/proposal-draft.json
 ```

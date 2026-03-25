@@ -14,6 +14,7 @@ from autopapers.phase1.papers.storage import write_fetch_record, write_search_re
 from autopapers.phase1.profile.extract import load_profile_from_json
 from autopapers.phase1.profile.store import save_profile
 from autopapers.phase1.profile.validate import load_schema, validate_profile
+from autopapers.phase2.corpus_input import load_corpus_text_for_proposal
 from autopapers.phase2.debate import merge_stub_to_proposal, run_debate_stub
 from autopapers.providers.base import PaperRef
 from autopapers.providers.registry import ProviderRegistry
@@ -309,7 +310,10 @@ def proposal_draft(
         "-c",
         exists=True,
         dir_okay=False,
-        help="Optional latest search metadata JSON under data/papers/metadata/",
+        help=(
+            "Corpus JSON (e.g. a search metadata file). "
+            "If omitted, uses data/kg/corpus-snapshot.json when present."
+        ),
     ),
     title: str = typer.Option("Research direction", "--title", "-t"),
 ) -> None:
@@ -325,9 +329,16 @@ def proposal_draft(
         ensure_ascii=False,
     )[:1200]
 
-    corpus_summary = ""
-    if corpus:
-        corpus_summary = corpus.read_text(encoding="utf-8")[:2000]
+    paths = get_paths()
+    corpus_summary, corpus_used = load_corpus_text_for_proposal(paths, corpus)
+    if corpus_used:
+        typer.echo(f"Using corpus: {corpus_used}", err=True)
+    elif not corpus_summary:
+        typer.echo(
+            "No corpus supplied and data/kg/corpus-snapshot.json missing; "
+            "run: uv run autopapers corpus build",
+            err=True,
+        )
 
     debate = run_debate_stub(profile_summary=prof_summary, corpus_summary=corpus_summary)
     proposal = merge_stub_to_proposal(title=title, debate=debate, status="draft")
@@ -335,7 +346,6 @@ def proposal_draft(
     prop_schema = load_schema(_proposal_schema_path())
     validate_profile(profile=proposal, schema=prop_schema)
 
-    paths = get_paths()
     paths.proposals_dir.mkdir(parents=True, exist_ok=True)
     out = paths.proposals_dir / "proposal-draft.json"
     out.write_text(json.dumps(proposal, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
