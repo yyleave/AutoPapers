@@ -51,6 +51,32 @@ def test_papers_fetch_local_pdf_copies_to_pdfs_dir(
     assert meta["id"] == "source"
 
 
+def test_papers_parse_custom_output_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    pdf = tmp_path / "in.pdf"
+    _tiny_pdf(pdf)
+    out = tmp_path / "nested" / "custom-out.txt"
+    r = CliRunner().invoke(
+        app,
+        [
+            "papers",
+            "parse",
+            "-i",
+            str(pdf),
+            "-o",
+            str(out),
+            "--max-pages",
+            "1",
+        ],
+    )
+    assert r.exit_code == 0
+    assert Path(r.stdout.strip()) == out
+    assert out.is_file()
+
+
 def test_papers_parse_writes_parsed_txt(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
