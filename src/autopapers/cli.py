@@ -22,6 +22,7 @@ from autopapers.phase2.corpus_input import load_corpus_text_for_proposal
 from autopapers.phase2.debate import merge_stub_to_proposal, run_debate_stub
 from autopapers.providers.base import PaperRef
 from autopapers.providers.registry import ProviderRegistry
+from autopapers.status_report import build_status
 
 app = typer.Typer(add_completion=False, help="AutoPapers CLI (MVP scaffold)")
 profile_app = typer.Typer(help="Phase 1: user profile utilities")
@@ -59,6 +60,15 @@ def _schema_path() -> Path:
 
 def _proposal_schema_path() -> Path:
     return Path(__file__).resolve().parent / "schemas" / "research_proposal.schema.json"
+
+
+@app.command("status")
+def cmd_status() -> None:
+    """
+    Print config, registered providers, and data directory counts (JSON).
+    """
+
+    typer.echo(json.dumps(build_status(), ensure_ascii=False, indent=2))
 
 
 @profile_app.command("init")

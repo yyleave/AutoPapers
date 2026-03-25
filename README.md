@@ -62,6 +62,9 @@ cd AutoPapers
 
 uv sync
 
+# 环境与数据目录概览（配置、已注册 provider、metadata/pdf 数量等）
+uv run autopapers status
+
 # Phase 1：用户画像
 uv run autopapers profile init -o user_profile.json
 uv run autopapers profile validate -i user_profile.json
