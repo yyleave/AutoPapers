@@ -9,6 +9,27 @@ from typer.testing import CliRunner
 from autopapers.cli import app
 
 
+def test_papers_search_local_pdf_directory_lists_pdfs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("AUTOPAPERS_PROVIDER", "local_pdf")
+    d = tmp_path / "pdf_dir"
+    d.mkdir()
+    (d / "first.pdf").write_bytes(b"%PDF")
+    (d / "second.pdf").write_bytes(b"%PDF")
+    r = CliRunner().invoke(
+        app,
+        ["papers", "search", "-q", str(d), "--no-save", "--limit", "10"],
+    )
+    assert r.exit_code == 0
+    rows = json.loads(r.stdout)
+    assert len(rows) == 2
+    ids = {row["id"] for row in rows}
+    assert ids == {"first", "second"}
+
+
 def test_papers_search_local_pdf_provider_no_save(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

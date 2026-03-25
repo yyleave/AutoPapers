@@ -61,6 +61,16 @@ def test_build_status_includes_corpus_summary_when_present(tmp_path: Path) -> No
     assert r["corpus_snapshot"]["summary"]["node_total"] == 1
 
 
+def test_build_status_corpus_snapshot_load_error_on_bad_json(tmp_path: Path) -> None:
+    paths = get_paths(repo_root=tmp_path)
+    paths.kg_dir.mkdir(parents=True)
+    (paths.kg_dir / "corpus-snapshot.json").write_text("{", encoding="utf-8")
+    r = build_status(paths=paths)
+    assert r["corpus_snapshot"]["present"] is True
+    assert r["corpus_snapshot"]["load_error"] is True
+    assert r["corpus_snapshot"]["summary"] is None
+
+
 def test_build_status_proposal_flags(tmp_path: Path) -> None:
     paths = get_paths(repo_root=tmp_path)
     paths.proposals_dir.mkdir(parents=True)
