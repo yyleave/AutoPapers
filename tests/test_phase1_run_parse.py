@@ -527,6 +527,80 @@ def test_phase1_run_fetch_first_arxiv_mocked_writes_search_and_fetch(
     mock_fetch.assert_called_once()
 
 
+@patch.object(ArxivProvider, "fetch_pdf")
+@patch.object(ArxivProvider, "search")
+def test_phase1_run_parse_fetched_arxiv_mocked_writes_txt_and_manifest(
+    mock_search: MagicMock,
+    mock_fetch: MagicMock,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    mock_search.return_value = [
+        PaperRef(
+            source="arxiv",
+            id="2501.07777",
+            title="Parse chain",
+            pdf_url="https://arxiv.org/pdf/2501.07777.pdf",
+        ),
+    ]
+    out_pdf = tmp_path / "data" / "papers" / "pdfs" / "2501.07777.pdf"
+    out_pdf.parent.mkdir(parents=True, exist_ok=True)
+    _tiny_pdf(out_pdf)
+    mock_fetch.return_value = out_pdf
+
+    prof = tmp_path / "p.json"
+    prof.write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "user": {"languages": ["en"]},
+                "background": {"domains": [], "skills": [], "constraints": []},
+                "hardware": {"device": "other"},
+                "research_intent": {
+                    "problem_statements": [],
+                    "keywords": ["parse-chain"],
+                    "non_goals": [],
+                    "risk_tolerance": "medium",
+                },
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    r = CliRunner().invoke(
+        app,
+        [
+            "phase1",
+            "run",
+            "--profile",
+            str(prof),
+            "--limit",
+            "1",
+            "--fetch-first",
+            "--parse-fetched",
+            "--parse-max-pages",
+            "1",
+        ],
+        env={"AUTOPAPERS_PROVIDER": "arxiv"},
+    )
+    assert r.exit_code == 0, r.stdout + r.stderr
+    summary, payload = _two_json_objects(r.stdout)
+    assert summary["count"] == 1
+    assert Path(str(payload["pdf"])).is_file()
+    txt = Path(str(payload["parsed_txt"]))
+    assert txt.name == "2501.07777.txt"
+    assert txt.is_file()
+    man = Path(str(payload["parse_manifest"]))
+    assert man.is_file()
+    man_doc = json.loads(man.read_text(encoding="utf-8"))
+    assert man_doc["type"] == "parse"
+    assert man_doc["input_pdf"] == str(out_pdf.resolve())
+    assert man_doc["pages_read"] >= 1
+    mock_search.assert_called_once_with(query="parse-chain", limit=1)
+    mock_fetch.assert_called_once()
+
+
 def test_phase1_parse_fetched_requires_fetch_first(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
