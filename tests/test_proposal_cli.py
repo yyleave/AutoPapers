@@ -138,7 +138,27 @@ def test_proposal_export_cli_rejects_invalid_json(
     bad = tmp_path / "not-json.json"
     bad.write_text("{", encoding="utf-8")
     r = CliRunner().invoke(app, ["proposal", "export", "-i", str(bad)])
-    assert r.exit_code != 0
+    assert r.exit_code == 1
+    err = json.loads(r.stderr.strip())
+    assert err["ok"] is False
+    assert err["error"] == "invalid_json"
+    assert "detail" in err
+    assert not bad.with_suffix(".md").is_file()
+
+
+def test_proposal_export_cli_rejects_schema_invalid_doc(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    shallow = tmp_path / "shallow.json"
+    shallow.write_text("{}", encoding="utf-8")
+    r = CliRunner().invoke(app, ["proposal", "export", "-i", str(shallow)])
+    assert r.exit_code == 1
+    err = json.loads(r.stderr.strip())
+    assert err["ok"] is False
+    assert err["error"] == "validation"
+    assert not shallow.with_suffix(".md").is_file()
 
 
 def test_proposal_export_default_writes_beside_json(

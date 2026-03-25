@@ -949,9 +949,25 @@ def proposal_export(
     Validate proposal JSON and write a readable Markdown summary (for notes / sharing).
     """
 
-    raw = json.loads(input.read_text(encoding="utf-8"))
+    try:
+        raw = json.loads(input.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        typer.echo(
+            json.dumps({"ok": False, "error": "invalid_json", "detail": str(e)}),
+            err=True,
+        )
+        raise typer.Exit(code=1) from e
+
     prop_schema = load_schema(_proposal_schema_path())
-    validate_profile(profile=raw, schema=prop_schema)
+    try:
+        validate_profile(profile=raw, schema=prop_schema)
+    except ValueError as e:
+        typer.echo(
+            json.dumps({"ok": False, "error": "validation", "detail": str(e)}, indent=2),
+            err=True,
+        )
+        raise typer.Exit(code=1) from e
+
     md = proposal_to_markdown(raw)
     out = output or input.with_suffix(".md")
     out.write_text(md, encoding="utf-8")
