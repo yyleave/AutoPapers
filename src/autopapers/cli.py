@@ -342,7 +342,8 @@ def proposal_draft(
         exists=True,
         dir_okay=False,
         help=(
-            "Corpus JSON (e.g. a search metadata file). "
+            "Corpus path. JSON with a snapshot 'nodes' list is expanded to paper lines "
+            "and TextExtract .txt snippets. "
             "If omitted, uses data/kg/corpus-snapshot.json when present."
         ),
     ),
