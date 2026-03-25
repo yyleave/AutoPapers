@@ -18,6 +18,28 @@ def _tiny_pdf(path: Path) -> None:
         writer.write(f)
 
 
+def test_papers_fetch_local_pdf_missing_path_exits_nonzero(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    missing = tmp_path / "does-not-exist.pdf"
+    r = CliRunner().invoke(
+        app,
+        [
+            "papers",
+            "fetch",
+            "--source",
+            "local_pdf",
+            "--id",
+            "x",
+            "--pdf-url",
+            str(missing),
+        ],
+    )
+    assert r.exit_code != 0
+
+
 def test_papers_fetch_local_pdf_copies_to_pdfs_dir(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

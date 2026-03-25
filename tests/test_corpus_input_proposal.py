@@ -11,6 +11,15 @@ from autopapers.phase2.corpus_input import (
 )
 
 
+def test_load_corpus_non_json_file_returns_truncated_text(tmp_path: Path) -> None:
+    paths = get_paths(repo_root=tmp_path)
+    plain = tmp_path / "notes.txt"
+    plain.write_text("Plain corpus context\n" + "x" * 100, encoding="utf-8")
+    text, used = load_corpus_text_for_proposal(paths, plain)
+    assert used == plain
+    assert text.startswith("Plain corpus context")
+
+
 def test_explicit_corpus_file(tmp_path: Path) -> None:
     paths = get_paths(repo_root=tmp_path)
     f = tmp_path / "x.json"

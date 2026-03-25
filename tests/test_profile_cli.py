@@ -9,6 +9,19 @@ from typer.testing import CliRunner
 from autopapers.cli import app
 
 
+def test_profile_init_default_writes_user_profile_json(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    r = CliRunner().invoke(app, ["profile", "init"])
+    assert r.exit_code == 0
+    default_path = tmp_path / "user_profile.json"
+    assert default_path.is_file()
+    data = json.loads(default_path.read_text(encoding="utf-8"))
+    assert data["schema_version"] == "0.1"
+
+
 def test_profile_init_writes_template(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
     out = tmp_path / "user_profile.json"
