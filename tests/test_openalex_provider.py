@@ -11,6 +11,16 @@ from autopapers.providers.openalex_provider import (
 
 
 @patch("autopapers.providers.openalex_provider.urllib.request.urlopen")
+def test_openalex_search_empty_results(mock_urlopen: MagicMock) -> None:
+    body = {"results": []}
+    resp = MagicMock()
+    resp.__enter__.return_value.read.return_value = json.dumps(body).encode("utf-8")
+    resp.__exit__.return_value = None
+    mock_urlopen.return_value = resp
+    assert OpenAlexProvider().search(query="nothing", limit=5) == []
+
+
+@patch("autopapers.providers.openalex_provider.urllib.request.urlopen")
 def test_openalex_search_parses_results(mock_urlopen: MagicMock) -> None:
     body = {
         "results": [
