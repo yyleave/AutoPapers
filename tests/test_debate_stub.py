@@ -18,3 +18,6 @@ def test_merge_stub_to_proposal_passes_status_and_debate_notes() -> None:
     assert prop["status"] == "confirmed"
     assert prop["debate_notes"] == debate
     assert prop["schema_version"] == "0.1"
+    prob = str(prop["problem"])
+    assert "Feasibility / scope (conservative):" in prob
+    assert "SanityAgent" in prob

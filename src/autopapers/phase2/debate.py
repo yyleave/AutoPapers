@@ -28,10 +28,17 @@ def merge_stub_to_proposal(
     debate: dict[str, str],
     status: str = "draft",
 ) -> dict[str, object]:
+    cons = debate["conservative"].strip()
+    if len(cons) > 400:
+        cons = f"{cons[:400]}…"
+    problem = (
+        "Derived from profile keywords / problem statements (fill manually).\n\n"
+        f"Feasibility / scope (conservative): {cons}"
+    )
     return {
         "schema_version": "0.1",
         "title": title,
-        "problem": "Derived from profile keywords / problem statements (fill manually).",
+        "problem": problem,
         "hypothesis": debate["radical"][:500],
         "contributions": [
             "TBD: primary empirical or theoretical contribution",
