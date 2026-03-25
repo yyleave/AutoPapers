@@ -231,6 +231,44 @@ def test_corpus_build_parse_manifest_only_creates_text_extract(
     assert te["output_txt"] == str(txt.resolve())
 
 
+def test_corpus_build_dry_run_parse_manifest_only_summary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    parsed = tmp_path / "data" / "papers" / "parsed"
+    parsed.mkdir(parents=True)
+    pdf = tmp_path / "data" / "papers" / "pdfs" / "dry.pdf"
+    pdf.parent.mkdir(parents=True)
+    pdf.write_bytes(b"%PDF")
+    txt = parsed / "dry.txt"
+    txt.write_text("x", encoding="utf-8")
+    (parsed / "dry.manifest.json").write_text(
+        json.dumps(
+            {
+                "type": "parse",
+                "created_at": "2026-03-01T00:00:00Z",
+                "input_pdf": str(pdf.resolve()),
+                "output_txt": str(txt.resolve()),
+                "char_count": 1,
+                "pages_total": 1,
+                "pages_read": 1,
+                "max_pages": 1,
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    r = CliRunner().invoke(app, ["corpus", "build", "--dry-run"])
+    assert r.exit_code == 0
+    out = json.loads(r.stdout)
+    assert out["dry_run"] is True
+    assert out["nodes_by_type"].get("TextExtract") == 1
+    assert out["edge_total"] == 0
+    assert not (tmp_path / "data" / "kg" / "corpus-snapshot.json").exists()
+
+
 def test_corpus_build_writes_snapshot_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
     meta = tmp_path / "data" / "papers" / "metadata"
