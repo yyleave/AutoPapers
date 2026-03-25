@@ -9,6 +9,54 @@ from typer.testing import CliRunner
 from autopapers.cli import app
 
 
+def test_proposal_draft_with_explicit_corpus_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    prof = tmp_path / "user.json"
+    assert CliRunner().invoke(app, ["profile", "init", "-o", str(prof)]).exit_code == 0
+    corp = tmp_path / "manual-corpus.json"
+    corp.write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "nodes": [
+                    {
+                        "id": "paper:arxiv:9",
+                        "type": "Paper",
+                        "label": "Nine",
+                        "source": "arxiv",
+                        "external_id": "9",
+                    }
+                ],
+                "edges": [],
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    r = CliRunner().invoke(
+        app,
+        [
+            "proposal",
+            "draft",
+            "--profile",
+            str(prof),
+            "--corpus",
+            str(corp),
+            "--title",
+            "With corpus",
+        ],
+    )
+    assert r.exit_code == 0
+    assert "Using corpus:" in (r.stderr or "")
+    draft = json.loads(Path(r.stdout.strip()).read_text(encoding="utf-8"))
+    assert draft["title"] == "With corpus"
+    notes = str(draft.get("debate_notes", ""))
+    assert "Nine" in notes or "arxiv" in notes
+
+
 def test_proposal_draft_cli_writes_json(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
     prof = tmp_path / "user.json"

@@ -53,6 +53,30 @@ def test_summarize_counts_by_type_and_relation() -> None:
     assert s["edges_by_relation"]["FETCHED"] == 1
 
 
+def test_corpus_info_custom_snapshot_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    custom = tmp_path / "other-snapshot.json"
+    custom.write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "nodes": [{"id": "f1", "type": "Fetch", "label": "x"}],
+                "edges": [],
+            },
+        ),
+        encoding="utf-8",
+    )
+    r = CliRunner().invoke(app, ["corpus", "info", "--snapshot", str(custom)])
+    assert r.exit_code == 0
+    out = json.loads(r.stdout)
+    assert out["node_total"] == 1
+    assert out["nodes_by_type"].get("Fetch") == 1
+    assert out["snapshot"] == str(custom.resolve())
+
+
 def test_corpus_info_cli(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
     kg = tmp_path / "data" / "kg"
