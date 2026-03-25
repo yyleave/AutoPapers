@@ -45,6 +45,17 @@ def test_newest_papers_metadata_missing_dir(tmp_path: Path) -> None:
     assert newest_papers_metadata(paths, kind="any") is None
 
 
+def test_newest_papers_metadata_search_kind_excludes_fetch_only_dir(
+    tmp_path: Path,
+) -> None:
+    paths = get_paths(repo_root=tmp_path)
+    meta = paths.papers_metadata_dir
+    meta.mkdir(parents=True)
+    (meta / "fetch-a.json").write_text("{}", encoding="utf-8")
+    assert newest_papers_metadata(paths, kind="search") is None
+    assert newest_papers_metadata(paths, kind="fetch") == meta / "fetch-a.json"
+
+
 def test_show_metadata_cli(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from typer.testing import CliRunner
 
@@ -63,3 +74,22 @@ def test_show_metadata_cli(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
     assert r.exit_code == 0
     out = json.loads(r.stdout)
     assert out["data"]["query"] == "q"
+
+
+def test_show_metadata_cli_latest_fetch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from typer.testing import CliRunner
+
+    from autopapers.cli import app
+
+    monkeypatch.chdir(tmp_path)
+    meta = tmp_path / "data" / "papers" / "metadata"
+    meta.mkdir(parents=True)
+    (meta / "fetch-z.json").write_text(
+        json.dumps({"type": "fetch", "id": "paper-1"}),
+        encoding="utf-8",
+    )
+
+    r = CliRunner().invoke(app, ["papers", "show-metadata", "--latest", "fetch"])
+    assert r.exit_code == 0
+    out = json.loads(r.stdout)
+    assert out["data"]["id"] == "paper-1"
