@@ -101,6 +101,35 @@ def test_proposal_draft_cli_writes_json(tmp_path: Path, monkeypatch: pytest.Monk
     assert data["status"] == "draft"
 
 
+def test_proposal_draft_custom_output_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    prof = tmp_path / "user.json"
+    assert CliRunner().invoke(app, ["profile", "init", "-o", str(prof)]).exit_code == 0
+    custom = tmp_path / "nested" / "custom-draft.json"
+    r = CliRunner().invoke(
+        app,
+        [
+            "proposal",
+            "draft",
+            "--profile",
+            str(prof),
+            "--output",
+            str(custom),
+            "--title",
+            "Custom out",
+        ],
+    )
+    assert r.exit_code == 0
+    assert Path(r.stdout.strip()).resolve() == custom.resolve()
+    assert custom.is_file()
+    data = json.loads(custom.read_text(encoding="utf-8"))
+    assert data["title"] == "Custom out"
+    assert data["status"] == "draft"
+
+
 def test_proposal_export_cli_rejects_invalid_json(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

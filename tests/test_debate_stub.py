@@ -11,6 +11,22 @@ def test_run_debate_stub_has_three_roles() -> None:
     assert "KillerAgent" in d["killer"]
 
 
+def test_merge_truncates_long_conservative_in_problem() -> None:
+    long_cons = "x" * 500
+    debate = {
+        "radical": "r",
+        "conservative": long_cons,
+        "killer": "k",
+    }
+    prop = merge_stub_to_proposal(title="T", debate=debate)
+    prob = str(prop["problem"])
+    assert prob.endswith("…")
+    prefix = "Feasibility / scope (conservative): "
+    assert prefix in prob
+    tail = prob.split(prefix, 1)[1].strip()
+    assert tail == "x" * 400 + "…"
+
+
 def test_merge_stub_to_proposal_passes_status_and_debate_notes() -> None:
     debate = run_debate_stub(profile_summary="p", corpus_summary="c")
     prop = merge_stub_to_proposal(title="My title", debate=debate, status="confirmed")
