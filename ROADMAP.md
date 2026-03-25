@@ -1,11 +1,22 @@
 # 开发路线图
 
+## 仓库现状（与 README / `autopapers` CLI 一致，约 v0.0.1）
+
+以下为本仓库已落地的脚手架能力；更完整的愿景与后续工作见各阶段清单。
+
+- [x] **统一 CLI**：Typer 入口 `autopapers`（`status`、`config`、`providers`、`version` 等）
+- [x] **Phase 1 脚手架**：用户画像 JSON Schema 与校验、多文献源检索（OpenAlex / Crossref / arXiv / AMiner / local_pdf）、metadata 落盘、`phase1 run`、`corpus` 快照与导出、`pypdf` 文本抽取占位
+- [x] **Phase 2 脚手架**：`research_proposal` JSON Schema；`proposal draft | validate | confirm | export`（辩论编排为 stub）
+- [ ] **尚未在本仓库实现**：Nougat/Marker 级解析、图谱本体与 Governed Memory 存储、真实 LLM 多智能体辩论、沙盒执行、防幻觉撰稿与 LaTeX 终稿等（见下方阶段）
+
+---
+
 ## 阶段 0: 项目初始化 ✅
 
 - [x] 仓库创建
 - [x] 核心文档编写
-- [ ] 目录结构搭建
-- [ ] 依赖管理配置
+- [x] 目录结构搭建（`src/autopapers`、`configs/`、`schemas/`、`tests/` 等）
+- [x] 依赖管理配置（`pyproject.toml` + **uv**）
 
 ---
 
@@ -163,13 +174,13 @@
 
 ### 5.3 用户界面
 
-- [ ] CLI 工具
+- [x] CLI 工具（`autopapers`）
 - [ ] Web 界面 (可选)
 - [ ] 进度可视化
 
 ### 5.4 测试与优化
 
-- [ ] 单元测试覆盖
+- [x] 单元测试覆盖（pytest；默认排除 `@pytest.mark.network`）
 - [ ] 集成测试
 - [ ] 性能优化
 
