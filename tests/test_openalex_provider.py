@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from autopapers.providers.base import PaperRef
 from autopapers.providers.openalex_provider import (
     OpenAlexProvider,
     _openalex_short_id,
@@ -18,6 +22,39 @@ def test_openalex_search_empty_results(mock_urlopen: MagicMock) -> None:
     resp.__exit__.return_value = None
     mock_urlopen.return_value = resp
     assert OpenAlexProvider().search(query="nothing", limit=5) == []
+
+
+@patch("autopapers.providers.openalex_provider.urllib.request.urlopen")
+def test_openalex_search_non_list_results(mock_urlopen: MagicMock) -> None:
+    body = {"results": "unexpected"}
+    resp = MagicMock()
+    resp.__enter__.return_value.read.return_value = json.dumps(body).encode("utf-8")
+    resp.__exit__.return_value = None
+    mock_urlopen.return_value = resp
+    assert OpenAlexProvider().search(query="q", limit=3) == []
+
+
+@patch("autopapers.providers.openalex_provider.urllib.request.urlopen")
+def test_openalex_search_skips_non_dict_work_entries(mock_urlopen: MagicMock) -> None:
+    body = {
+        "results": [
+            None,
+            {"id": "https://openalex.org/W9", "title": "Keep"},
+        ],
+    }
+    resp = MagicMock()
+    resp.__enter__.return_value.read.return_value = json.dumps(body).encode("utf-8")
+    resp.__exit__.return_value = None
+    mock_urlopen.return_value = resp
+    refs = OpenAlexProvider().search(query="q", limit=5)
+    assert len(refs) == 1
+    assert refs[0].id == "W9"
+
+
+def test_openalex_fetch_pdf_requires_url(tmp_path: Path) -> None:
+    ref = PaperRef(source="openalex", id="W1", title="t", pdf_url=None)
+    with pytest.raises(ValueError, match="No PDF URL"):
+        OpenAlexProvider().fetch_pdf(ref=ref, dest_dir=tmp_path)
 
 
 @patch("autopapers.providers.openalex_provider.urllib.request.urlopen")

@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from autopapers.providers.base import PaperRef
 from autopapers.providers.crossref_provider import (
     CrossrefProvider,
     _pick_pdf_url,
@@ -28,6 +32,12 @@ def test_crossref_search_non_list_items_returns_empty(mock_urlopen: MagicMock) -
     resp.__exit__.return_value = None
     mock_urlopen.return_value = resp
     assert CrossrefProvider().search(query="x", limit=5) == []
+
+
+def test_crossref_fetch_pdf_requires_url(tmp_path: Path) -> None:
+    ref = PaperRef(source="crossref", id="10.1/2", title="t", pdf_url=None)
+    with pytest.raises(ValueError, match="No PDF link"):
+        CrossrefProvider().fetch_pdf(ref=ref, dest_dir=tmp_path)
 
 
 @patch("autopapers.providers.crossref_provider.urllib.request.urlopen")
