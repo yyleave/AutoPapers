@@ -51,6 +51,18 @@ def test_papers_search_writes_search_metadata_when_not_no_save(
     assert row["count"] == 1
 
 
+def test_show_metadata_latest_empty_dir_exits(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "data" / "papers" / "metadata").mkdir(parents=True)
+    r = CliRunner().invoke(app, ["papers", "show-metadata", "--latest", "any"])
+    assert r.exit_code == 1
+    err = json.loads(r.stderr.strip())
+    assert err["error"] == "no_metadata_files"
+
+
 def test_show_metadata_requires_path_or_latest() -> None:
     r = CliRunner().invoke(app, ["papers", "show-metadata"])
     assert r.exit_code == 1
