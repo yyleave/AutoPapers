@@ -131,7 +131,7 @@ uv run autopapers proposal confirm -i ./data/proposals/proposal-draft.json
 uv run autopapers proposal export -i ./data/proposals/proposal-draft.json
 ```
 
-**Legacy**：`src/paper_fetcher.py` 与 `src/api/` 为早期脚本，仍以 `python src/paper_fetcher.py` 等方式可用，但新开发请以 `autopapers` 为准。
+**Legacy**：`src/paper_fetcher.py` 与 `src/api/` 为早期脚本，仍以 `python src/paper_fetcher.py`（仓库根目录）等方式可用；脚本会将 `src/` 注入 `sys.path`，便于未安装可编辑包时导入 `api`。新开发请以 `autopapers` 为准。
 
 另可按仓库内 `requirements.txt` 使用 `pip`（与 uv 二选一即可）。
 

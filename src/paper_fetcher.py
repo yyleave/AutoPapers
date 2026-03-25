@@ -6,13 +6,22 @@
 对外推荐入口：`uv run autopapers`（见 README）。本模块保留用于迁移与对照。
 """
 
+from __future__ import annotations
+
 import os
 import sys
+from pathlib import Path
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Legacy 脚本：保证在「仅 python src/paper_fetcher.py」且未安装可编辑包时仍能导入 src/api
+_here = Path(__file__).resolve().parent
+_repo_root = _here.parent
+for _p in (_repo_root, _here):
+    _s = str(_p)
+    if _s not in sys.path:
+        sys.path.insert(0, _s)
 
-from api.aminer_client import AMinerClient, Paper, format_paper_info
-from api.pdf_downloader import PDFDownloader, DownloadResult
+from api.aminer_client import AMinerClient, Paper
+from api.pdf_downloader import DownloadResult, PDFDownloader
 
 
 class PaperFetcher:
@@ -20,8 +29,8 @@ class PaperFetcher:
 
     def __init__(
         self,
-        aminer_token: str = None,
-        download_dir: str = "./downloads"
+        aminer_token: str | None = None,
+        download_dir: str = "./downloads",
     ):
         self.aminer = None
         self.aminer_token = aminer_token or os.environ.get("AMINER_API_KEY")
@@ -33,7 +42,7 @@ class PaperFetcher:
             except ValueError as e:
                 print(f"警告: {e}")
 
-    def search_papers(self, query: str, limit: int = 10) -> list:
+    def search_papers(self, query: str, limit: int = 10) -> list[Paper]:
         """通过 AMiner 搜索论文"""
         if not self.aminer:
             print("错误: 未配置 AMiner API Token")
@@ -57,7 +66,7 @@ class PaperFetcher:
         query: str,
         limit: int = 5,
         auto_download: bool = True
-    ) -> list:
+    ) -> list[Paper]:
         """
         完整流程：搜索 + 下载
 
