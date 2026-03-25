@@ -1,11 +1,24 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from autopapers.providers.arxiv_provider import ArxivProvider, _arxiv_id_from_entry_id
 from autopapers.providers.base import PaperRef
+
+
+@patch("autopapers.providers.arxiv_provider.urllib.request.urlopen")
+def test_arxiv_search_empty_atom_feed(mock_urlopen: MagicMock) -> None:
+    xml = b"""<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom"></feed>
+"""
+    resp = MagicMock()
+    resp.__enter__.return_value.read.return_value = xml
+    resp.__exit__.return_value = None
+    mock_urlopen.return_value = resp
+    assert ArxivProvider().search(query="zzzznomatchzzzz", limit=5) == []
 
 
 def test_arxiv_fetch_pdf_requires_pdf_url(tmp_path: Path) -> None:

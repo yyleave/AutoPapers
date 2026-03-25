@@ -33,6 +33,21 @@ def test_resolve_data_repo_root_explicit_wins(
     assert _resolve_data_repo_root(explicit) == explicit.resolve()
 
 
+def test_load_config_env_without_default_toml(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AUTOPAPERS_REPO_ROOT", str(tmp_path))
+    monkeypatch.setenv("AUTOPAPERS_PROVIDER", "crossref")
+    monkeypatch.setenv("AUTOPAPERS_LOG_LEVEL", "DEBUG")
+    monkeypatch.delenv("AUTOPAPERS_CONTACT_EMAIL", raising=False)
+    cfg_path = tmp_path / "configs" / "default.toml"
+    assert not cfg_path.is_file()
+    c = load_config()
+    assert c.provider == "crossref"
+    assert c.log_level == "DEBUG"
+
+
 def test_load_config_reads_toml_under_autopapers_repo_root(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
