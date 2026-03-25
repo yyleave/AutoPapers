@@ -253,6 +253,47 @@ def test_load_corpus_snapshot_not_object(tmp_path: Path) -> None:
         load_corpus_snapshot_document(p)
 
 
+def test_corpus_export_edges_missing_default_snapshot_exits(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    r = CliRunner().invoke(app, ["corpus", "export-edges"])
+    assert r.exit_code == 1
+    err = json.loads(r.stderr.strip())
+    assert err["error"] == "snapshot_not_found"
+
+
+def test_corpus_export_nodes_invalid_snapshot_json_exits(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    kg = tmp_path / "data" / "kg"
+    kg.mkdir(parents=True)
+    snap = kg / "corpus-snapshot.json"
+    snap.write_text("{", encoding="utf-8")
+    r = CliRunner().invoke(app, ["corpus", "export-nodes"])
+    assert r.exit_code == 1
+    err = json.loads(r.stderr.strip())
+    assert err["error"] == "invalid_json"
+
+
+def test_corpus_export_edges_snapshot_not_object_exits(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    kg = tmp_path / "data" / "kg"
+    kg.mkdir(parents=True)
+    snap = kg / "corpus-snapshot.json"
+    snap.write_text("[]", encoding="utf-8")
+    r = CliRunner().invoke(app, ["corpus", "export-edges"])
+    assert r.exit_code == 1
+    err = json.loads(r.stderr.strip())
+    assert err["error"] == "expected_object"
+
+
 def test_corpus_export_edges_cli(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
     kg = tmp_path / "data" / "kg"
