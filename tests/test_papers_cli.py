@@ -12,6 +12,7 @@ from autopapers.providers.arxiv_provider import ArxivProvider
 from autopapers.providers.base import PaperRef
 from autopapers.providers.crossref_provider import CrossrefProvider
 from autopapers.providers.openalex_provider import OpenAlexProvider
+from autopapers.repo_paths import ensure_legacy_api_on_path
 
 
 def test_papers_search_local_pdf_directory_lists_pdfs(
@@ -252,6 +253,69 @@ def test_papers_search_crossref_no_save_skips_metadata_write(
     meta_dir = tmp_path / "data" / "papers" / "metadata"
     assert (not meta_dir.is_dir()) or not list(meta_dir.glob("search-*.json"))
     mock_search.assert_called_once_with(query="cells", limit=2)
+
+
+@patch("api.aminer_client.AMinerClient")
+def test_papers_search_aminer_cli_mocked_writes_search_metadata(
+    mock_client_cls: MagicMock,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ensure_legacy_api_on_path()
+    from api.aminer_client import Paper
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("AUTOPAPERS_PROVIDER", "aminer")
+    mock_inst = MagicMock()
+    mock_client_cls.return_value = mock_inst
+    p = Paper(
+        id="aminer-cli-1",
+        title="AM title",
+        authors=["A"],
+        pdf_url="https://x/y.pdf",
+    )
+    mock_inst.paper_search.return_value = [p]
+    mock_inst.paper_info.return_value = [p]
+
+    r = CliRunner().invoke(app, ["papers", "search", "-q", "topic search", "--limit", "3"])
+    assert r.exit_code == 0
+    rows = json.loads(r.stdout.strip())
+    assert len(rows) == 1
+    assert rows[0]["id"] == "aminer-cli-1"
+    assert rows[0]["source"] == "aminer"
+    assert "Wrote metadata" in (r.stderr or "")
+    found = list((tmp_path / "data" / "papers" / "metadata").glob("search-*.json"))
+    assert len(found) == 1
+    row = json.loads(found[0].read_text(encoding="utf-8"))
+    assert row["provider"] == "aminer"
+    assert row["query"] == "topic search"
+    assert row["count"] == 1
+    mock_inst.paper_search.assert_called_once_with("topic search", page=0, size=3)
+    mock_inst.paper_info.assert_called_once_with(["aminer-cli-1"])
+
+
+@patch("api.aminer_client.AMinerClient")
+def test_papers_search_aminer_no_save_empty_skips_metadata(
+    mock_client_cls: MagicMock,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mock_inst = MagicMock()
+    mock_client_cls.return_value = mock_inst
+    mock_inst.paper_search.return_value = []
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("AUTOPAPERS_PROVIDER", "aminer")
+    r = CliRunner().invoke(
+        app,
+        ["papers", "search", "-q", "none", "--limit", "1", "--no-save"],
+    )
+    assert r.exit_code == 0
+    assert json.loads(r.stdout.strip()) == []
+    assert "Wrote metadata" not in (r.stderr or "")
+    meta_dir = tmp_path / "data" / "papers" / "metadata"
+    assert (not meta_dir.is_dir()) or not list(meta_dir.glob("search-*.json"))
+    mock_inst.paper_info.assert_not_called()
 
 
 def test_show_metadata_latest_empty_dir_exits(
