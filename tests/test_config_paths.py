@@ -40,12 +40,30 @@ def test_load_config_reads_toml_under_autopapers_repo_root(
     cfg_dir = tmp_path / "configs"
     cfg_dir.mkdir(parents=True)
     (cfg_dir / "default.toml").write_text(
-        'provider = "openalex"\nlog_level = "WARNING"\n',
+        'provider = "openalex"\nlog_level = "WARNING"\ncontact_email = "toml@example.com"\n',
         encoding="utf-8",
     )
     monkeypatch.setenv("AUTOPAPERS_REPO_ROOT", str(tmp_path))
     monkeypatch.delenv("AUTOPAPERS_PROVIDER", raising=False)
     monkeypatch.delenv("AUTOPAPERS_LOG_LEVEL", raising=False)
+    monkeypatch.delenv("AUTOPAPERS_CONTACT_EMAIL", raising=False)
     c = load_config()
     assert c.provider == "openalex"
     assert c.log_level == "WARNING"
+    assert c.contact_email == "toml@example.com"
+
+
+def test_load_config_contact_email_env_overrides_toml(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg_dir = tmp_path / "configs"
+    cfg_dir.mkdir(parents=True)
+    (cfg_dir / "default.toml").write_text(
+        'contact_email = "a@b.c"\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("AUTOPAPERS_REPO_ROOT", str(tmp_path))
+    monkeypatch.setenv("AUTOPAPERS_CONTACT_EMAIL", "env@example.com")
+    c = load_config()
+    assert c.contact_email == "env@example.com"

@@ -15,6 +15,7 @@ def test_config_command_outputs_json() -> None:
     assert "effective" in data
     assert "provider" in data["effective"]
     assert "log_level" in data["effective"]
+    assert "contact_email" in data["effective"]
     assert "default_toml_path" in data
     assert "data_repo_root" in data
     assert "env_override" in data

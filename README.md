@@ -85,6 +85,7 @@ uv run autopapers profile show -i user_profile.json
 # 文献检索（AUTOPAPERS_PROVIDER：arxiv / openalex / crossref / local_pdf / aminer）
 # HTTP User-Agent 邮箱（OpenAlex / Crossref / arXiv 等）：优先 AUTOPAPERS_MAILTO，否则 OPENALEX_MAILTO / CROSSREF_MAILTO
 # export AUTOPAPERS_MAILTO='you@example.com'
+# 可选：configs/default.toml 的 contact_email 或环境变量 AUTOPAPERS_CONTACT_EMAIL，仅在 config/status 中展示（不替代上述 UA）
 uv run autopapers papers search -q "transformer" -l 3
 
 # 列出已写入的检索/抓取元数据 JSON（按修改时间倒序）

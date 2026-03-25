@@ -74,6 +74,8 @@ def get_paths(*, repo_root: Path | None = None) -> Paths:
 class AppConfig:
     log_level: str = "INFO"
     provider: str = "arxiv"
+    #: Optional contact for ``autopapers config`` / status (HTTP polite pool still uses mailto env).
+    contact_email: str | None = None
 
 
 def default_toml_path() -> Path:
@@ -96,6 +98,7 @@ def load_config() -> AppConfig:
     """
     log_level = "INFO"
     provider = "arxiv"
+    contact_email: str | None = None
 
     cfg_path = default_toml_path()
     if cfg_path.is_file():
@@ -103,9 +106,17 @@ def load_config() -> AppConfig:
         if isinstance(data, dict):
             log_level = str(data.get("log_level", log_level))
             provider = str(data.get("provider", provider))
+            ce = data.get("contact_email")
+            if isinstance(ce, str) and ce.strip():
+                contact_email = ce.strip()
+
+    env_ce = os.environ.get("AUTOPAPERS_CONTACT_EMAIL", "").strip()
+    if env_ce:
+        contact_email = env_ce
 
     return AppConfig(
         log_level=os.environ.get("AUTOPAPERS_LOG_LEVEL", log_level),
         provider=os.environ.get("AUTOPAPERS_PROVIDER", provider),
+        contact_email=contact_email,
     )
 

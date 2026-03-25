@@ -150,10 +150,13 @@ def cmd_config() -> None:
                 "effective": {
                     "provider": cfg.provider,
                     "log_level": cfg.log_level,
+                    "contact_email": cfg.contact_email,
                 },
                 "env_override": {
                     "AUTOPAPERS_PROVIDER": os.environ.get("AUTOPAPERS_PROVIDER") is not None,
                     "AUTOPAPERS_LOG_LEVEL": os.environ.get("AUTOPAPERS_LOG_LEVEL") is not None,
+                    "AUTOPAPERS_CONTACT_EMAIL": os.environ.get("AUTOPAPERS_CONTACT_EMAIL")
+                    is not None,
                     "AUTOPAPERS_REPO_ROOT": bool(
                         os.environ.get("AUTOPAPERS_REPO_ROOT", "").strip()
                     ),

@@ -24,6 +24,7 @@ def test_build_status_counts(tmp_path: Path) -> None:
     assert "crossref" in r["providers"]
     assert "default_toml_path" in r["config"]
     assert "default_toml_present" in r["config"]
+    assert "contact_email" in r["config"]
     assert r["corpus_snapshot"]["present"] is False
     assert r["corpus_snapshot"]["summary"] is None
 

@@ -58,6 +58,7 @@ def build_status(
         "config": {
             "provider": c.provider,
             "log_level": c.log_level,
+            "contact_email": c.contact_email,
             "default_toml_path": str(cfg_toml),
             "default_toml_present": cfg_toml.is_file(),
         },
