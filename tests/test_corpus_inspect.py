@@ -187,6 +187,50 @@ def test_corpus_build_writes_empty_snapshot_without_metadata(
     assert data["edges"] == []
 
 
+def test_corpus_build_parse_manifest_only_creates_text_extract(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """No papers metadata: a lone *.manifest.json still yields a TextExtract node."""
+    monkeypatch.chdir(tmp_path)
+    parsed = tmp_path / "data" / "papers" / "parsed"
+    parsed.mkdir(parents=True)
+    pdf = tmp_path / "data" / "papers" / "pdfs" / "orphan.pdf"
+    pdf.parent.mkdir(parents=True)
+    pdf.write_bytes(b"%PDF-orphan")
+    txt = parsed / "orphan.txt"
+    txt.write_text("extracted line\n", encoding="utf-8")
+    man = parsed / "orphan.manifest.json"
+    man.write_text(
+        json.dumps(
+            {
+                "type": "parse",
+                "created_at": "2026-01-02T00:00:00Z",
+                "input_pdf": str(pdf.resolve()),
+                "output_txt": str(txt.resolve()),
+                "char_count": 14,
+                "pages_total": 1,
+                "pages_read": 1,
+                "max_pages": 1,
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    r = CliRunner().invoke(app, ["corpus", "build"])
+    assert r.exit_code == 0
+    snap_path = tmp_path / "data" / "kg" / "corpus-snapshot.json"
+    data = json.loads(snap_path.read_text(encoding="utf-8"))
+    types = [n["type"] for n in data["nodes"]]
+    assert types == ["TextExtract"]
+    assert data["node_count"] == 1
+    assert data["edge_count"] == 0
+    te = data["nodes"][0]
+    assert te["type"] == "TextExtract"
+    assert te["output_txt"] == str(txt.resolve())
+
+
 def test_corpus_build_writes_snapshot_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
     meta = tmp_path / "data" / "papers" / "metadata"
