@@ -149,6 +149,26 @@ def test_corpus_build_dry_run_skips_write(tmp_path: Path, monkeypatch: pytest.Mo
     assert not snap.is_file()
 
 
+def test_corpus_build_writes_empty_snapshot_without_metadata(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    meta = tmp_path / "data" / "papers" / "metadata"
+    assert not meta.is_dir()
+    r = CliRunner().invoke(app, ["corpus", "build"])
+    assert r.exit_code == 0
+    snap_path = tmp_path / "data" / "kg" / "corpus-snapshot.json"
+    assert snap_path.is_file()
+    assert r.stdout.strip() == str(snap_path.resolve())
+    data = json.loads(snap_path.read_text(encoding="utf-8"))
+    assert data["schema_version"] == "0.1"
+    assert data["node_count"] == 0
+    assert data["edge_count"] == 0
+    assert data["nodes"] == []
+    assert data["edges"] == []
+
+
 def test_corpus_build_writes_snapshot_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
     meta = tmp_path / "data" / "papers" / "metadata"
