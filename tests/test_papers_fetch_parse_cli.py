@@ -9,6 +9,7 @@ from pypdf import PdfWriter
 from typer.testing import CliRunner
 
 from autopapers.cli import app
+from autopapers.providers.aminer_provider import AminerProvider
 from autopapers.providers.arxiv_provider import ArxivProvider
 from autopapers.providers.crossref_provider import CrossrefProvider
 from autopapers.providers.openalex_provider import OpenAlexProvider
@@ -191,6 +192,46 @@ def test_papers_fetch_openalex_cli_mocked_writes_fetch_metadata(
     doc = json.loads(metas[0].read_text(encoding="utf-8"))
     assert doc["type"] == "fetch"
     assert doc["id"] == "W200"
+    mock_fetch.assert_called_once()
+
+
+@patch.object(AminerProvider, "fetch_pdf")
+def test_papers_fetch_aminer_cli_mocked_writes_fetch_metadata(
+    mock_fetch: MagicMock,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    out_pdf = tmp_path / "data" / "papers" / "pdfs" / "PID_001.pdf"
+    out_pdf.parent.mkdir(parents=True, exist_ok=True)
+    out_pdf.write_bytes(b"%PDF-aminer")
+    mock_fetch.return_value = out_pdf
+
+    r = CliRunner().invoke(
+        app,
+        [
+            "papers",
+            "fetch",
+            "--source",
+            "aminer",
+            "--id",
+            "PID_001",
+            "--title",
+            "AMiner paper",
+            "--pdf-url",
+            "https://static.aminer.cn/pdf/example.pdf",
+        ],
+    )
+    assert r.exit_code == 0
+    first_line = r.stdout.strip().split("\n", 1)[0]
+    assert first_line == str(out_pdf.resolve())
+    assert "Wrote metadata" in (r.stderr or "")
+    metas = list((tmp_path / "data" / "papers" / "metadata").glob("fetch-*.json"))
+    assert len(metas) == 1
+    doc = json.loads(metas[0].read_text(encoding="utf-8"))
+    assert doc["type"] == "fetch"
+    assert doc["id"] == "PID_001"
+    assert doc["source"] == "aminer"
     mock_fetch.assert_called_once()
 
 

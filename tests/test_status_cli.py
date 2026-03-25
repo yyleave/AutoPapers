@@ -63,3 +63,21 @@ def test_status_cli_reflects_proposal_confirmed_file(
     data = json.loads(r.stdout)
     assert data["data"]["proposal_draft_exists"] is False
     assert data["data"]["proposal_confirmed_exists"] is True
+
+
+def test_status_cli_reflects_both_proposal_files(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AUTOPAPERS_REPO_ROOT", str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    prop_dir = tmp_path / "data" / "proposals"
+    prop_dir.mkdir(parents=True)
+    (prop_dir / "proposal-draft.json").write_text("{}", encoding="utf-8")
+    (prop_dir / "proposal-confirmed.json").write_text("{}", encoding="utf-8")
+
+    r = CliRunner().invoke(app, ["status"])
+    assert r.exit_code == 0
+    data = json.loads(r.stdout)
+    assert data["data"]["proposal_draft_exists"] is True
+    assert data["data"]["proposal_confirmed_exists"] is True
