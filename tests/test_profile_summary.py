@@ -10,6 +10,14 @@ from autopapers.cli import app
 from autopapers.phase1.profile.summary import compact_profile_view
 
 
+def test_compact_profile_view_empty_profile() -> None:
+    v = compact_profile_view({})
+    assert v["schema_version"] is None
+    assert v["display_name"] is None
+    assert v["keywords"] == []
+    assert v["problem_statements"] == []
+
+
 def test_compact_profile_view_shape() -> None:
     prof = {
         "schema_version": "0.1",
