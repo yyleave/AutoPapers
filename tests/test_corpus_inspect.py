@@ -106,6 +106,20 @@ def test_snapshot_edges_to_csv_rows() -> None:
     assert lines[1] == "x,y,R"
 
 
+def test_snapshot_edges_to_csv_relation_filter() -> None:
+    data = {
+        "edges": [
+            {"relation": "FETCHED", "source": "x", "target": "y"},
+            {"relation": "SEARCH_HIT", "source": "q", "target": "y"},
+        ]
+    }
+    csv = snapshot_edges_to_csv(data, relation_filter="FETCHED")
+    lines = csv.strip().split("\n")
+    assert len(lines) == 2
+    assert "FETCHED" in lines[1]
+    assert "SEARCH_HIT" not in lines[1]
+
+
 def test_load_corpus_snapshot_document(tmp_path: Path) -> None:
     p = tmp_path / "x.json"
     p.write_text('{"a": 1}', encoding="utf-8")
@@ -133,6 +147,35 @@ def test_corpus_export_edges_cli(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     r = CliRunner().invoke(app, ["corpus", "export-edges"])
     assert r.exit_code == 0
     assert "FETCHED" in r.stdout
+
+
+def test_corpus_export_edges_relation_filter_cli(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    kg = tmp_path / "data" / "kg"
+    kg.mkdir(parents=True)
+    snap = kg / "corpus-s.json"
+    snap.write_text(
+        json.dumps(
+            {
+                "edges": [
+                    {"source": "a", "target": "b", "relation": "FETCHED"},
+                    {"source": "q", "target": "b", "relation": "SEARCH_HIT"},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    r = CliRunner().invoke(
+        app,
+        ["corpus", "export-edges", "-s", str(snap), "-r", "SEARCH_HIT"],
+    )
+    assert r.exit_code == 0
+    rows = [ln for ln in r.stdout.strip().split("\n") if ln]
+    assert len(rows) == 2
+    assert rows[1] == "q,b,SEARCH_HIT"
 
 
 def test_corpus_export_nodes_type_filter_cli(

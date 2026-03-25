@@ -115,6 +115,7 @@ uv run autopapers corpus info
 
 # 将快照中的边导出为 CSV（默认打印；可用 -o 写入文件）
 uv run autopapers corpus export-edges
+# uv run autopapers corpus export-edges -r FETCHED -o fetched.csv
 uv run autopapers corpus export-nodes
 # uv run autopapers corpus export-nodes -t Paper -o papers.csv
 

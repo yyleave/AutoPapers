@@ -54,8 +54,11 @@ def summarize_corpus_snapshot(data: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def snapshot_edges_to_csv(data: dict[str, Any]) -> str:
-    """Serialize snapshot ``edges`` to CSV (header: source,target,relation)."""
+def snapshot_edges_to_csv(data: dict[str, Any], *, relation_filter: str | None = None) -> str:
+    """Serialize snapshot ``edges`` to CSV (header: source,target,relation).
+
+    If ``relation_filter`` is set, only edges whose ``relation`` matches are included.
+    """
 
     edges_raw = data.get("edges")
     edges = edges_raw if isinstance(edges_raw, list) else []
@@ -65,11 +68,14 @@ def snapshot_edges_to_csv(data: dict[str, Any]) -> str:
     for e in edges:
         if not isinstance(e, dict):
             continue
+        rel = e.get("relation", "")
+        if relation_filter is not None and str(rel) != relation_filter:
+            continue
         w.writerow(
             [
                 e.get("source", ""),
                 e.get("target", ""),
-                e.get("relation", ""),
+                rel,
             ]
         )
     return buf.getvalue()

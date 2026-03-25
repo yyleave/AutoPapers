@@ -722,13 +722,19 @@ def corpus_export_edges(
         "-o",
         help="Write CSV here (default: print to stdout)",
     ),
+    relation: str | None = typer.Option(
+        None,
+        "--relation",
+        "-r",
+        help="Only edges with this relation (e.g. FETCHED, SEARCH_HIT)",
+    ),
 ) -> None:
     """Export graph edges from a corpus snapshot as CSV (source,target,relation)."""
 
     paths = get_paths()
     _, data = _load_corpus_snapshot_for_cli(paths, snapshot)
 
-    csv_text = snapshot_edges_to_csv(data)
+    csv_text = snapshot_edges_to_csv(data, relation_filter=relation)
     if output is not None:
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(csv_text, encoding="utf-8")
