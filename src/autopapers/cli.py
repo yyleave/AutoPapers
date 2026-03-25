@@ -9,7 +9,7 @@ import typer
 from autopapers.config import get_paths, load_config
 from autopapers.logging_utils import setup_logging
 from autopapers.phase1.corpus_snapshot import build_corpus_snapshot, write_corpus_snapshot
-from autopapers.phase1.papers.parse_pdf import extract_pdf_text_with_stats
+from autopapers.phase1.papers.parse_pdf import extract_and_save_txt
 from autopapers.phase1.papers.storage import (
     write_fetch_record,
     write_parse_manifest,
@@ -243,9 +243,10 @@ def papers_parse(
     paths = get_paths()
     paths.papers_parsed_dir.mkdir(parents=True, exist_ok=True)
     out = output or (paths.papers_parsed_dir / f"{input.stem}.txt")
-    limit = None if max_pages in (0, None) else max_pages
-    text, pages_total, pages_read = extract_pdf_text_with_stats(input, max_pages=limit)
-    out.write_text(text + "\n", encoding="utf-8")
+    limit = None if max_pages == 0 else max_pages
+    text, pages_total, pages_read = extract_and_save_txt(
+        input, out, max_pages=limit
+    )
     typer.echo(str(out))
     if write_manifest:
         meta = write_parse_manifest(
@@ -257,6 +258,64 @@ def papers_parse(
             max_pages_config=max_pages,
         )
         typer.echo(f"Wrote manifest: {meta}", err=True)
+
+
+@papers_app.command("parse-batch")
+def papers_parse_batch(
+    input_dir: Path = typer.Option(
+        ...,
+        "--input-dir",
+        exists=True,
+        file_okay=False,
+        help="Directory containing PDFs",
+    ),
+    pattern: str = typer.Option("*.pdf", "--pattern", help="Glob relative to input-dir"),
+    max_pages: int = typer.Option(
+        20,
+        "--max-pages",
+        help="Max pages per file (default 20); 0 = all pages",
+    ),
+    write_manifest: bool = typer.Option(
+        False,
+        "--write-manifest",
+        help="Write a .manifest.json beside each .txt",
+    ),
+) -> None:
+    """
+    Extract text from every PDF matching pattern under input-dir into data/papers/parsed/.
+    """
+
+    paths = get_paths()
+    paths.papers_parsed_dir.mkdir(parents=True, exist_ok=True)
+    limit = None if max_pages == 0 else max_pages
+    candidates = sorted(input_dir.glob(pattern))
+    parsed = 0
+    errors: list[str] = []
+    for pdf in candidates:
+        if not pdf.is_file():
+            continue
+        out = paths.papers_parsed_dir / f"{pdf.stem}.txt"
+        try:
+            text, pages_total, pages_read = extract_and_save_txt(
+                pdf, out, max_pages=limit
+            )
+            parsed += 1
+            typer.echo(str(out))
+            if write_manifest:
+                meta = write_parse_manifest(
+                    pdf_path=pdf,
+                    txt_path=out,
+                    char_count=len(text),
+                    pages_total=pages_total,
+                    pages_read=pages_read,
+                    max_pages_config=max_pages,
+                )
+                typer.echo(f"manifest: {meta}", err=True)
+        except Exception as e:  # noqa: BLE001 — batch should continue
+            errors.append(f"{pdf.name}: {e}")
+            typer.echo(f"skip {pdf.name}: {e}", err=True)
+    summary = {"parsed": parsed, "candidates": len(candidates), "errors": errors}
+    typer.echo(json.dumps(summary, ensure_ascii=False, indent=2), err=True)
 
 
 @phase1_app.command("run")
