@@ -50,6 +50,7 @@ Phase 4: 防幻觉论文编撰
 - [工作流程](./WORKFLOW.md)
 - [参考资源](./REFERENCES.md)
 - [开发路线图](./ROADMAP.md)
+- [AMiner API 集成](./docs/AMINER_API.md)
 
 ## 快速开始
 

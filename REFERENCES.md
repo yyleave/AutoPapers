@@ -97,13 +97,23 @@
 
 ### AMiner API
 
-**文档**: https://www.aminer.cn/open/docs?id=64f03e746221825d961dbde4
+**官方文档**: https://open.aminer.cn/open/docs
+
+**控制台**: https://open.aminer.cn/open/board?tab=control
+
+**集成文档**: [docs/AMINER_API.md](./docs/AMINER_API.md)
+
+**数据规模**：
+- 3.5亿+ 论文
+- 1.35亿 学者
+- 4000万 专利
 
 **核心能力**：
 - 学术关系元数据
 - 引用网络图谱
 - 学者画像
 - 领域发展脉络
+- 28 个开放 API（论文/学者/机构/期刊/专利）
 
 **系统角色**：知识图谱骨架初始化、精准定点
 
