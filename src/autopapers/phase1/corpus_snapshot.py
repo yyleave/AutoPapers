@@ -31,12 +31,13 @@ def build_corpus_snapshot(
     """
     Merge Phase 1 metadata JSON files into a single JSON graph (MVP for KG).
 
-    Nodes: Paper, SearchQuery, Fetch, User (optional).
-    Edges: SEARCHED_FOR, FETCHED (stub relations for downstream tooling).
+    Nodes: Paper, SearchQuery, Fetch, TextExtract (from *.manifest.json), User (optional).
+    Edges: SEARCH_HIT, FETCHED, EXTRACTED_FROM (parse → paper when pdf path matches fetch).
     """
     nodes: list[dict[str, Any]] = []
     edges: list[dict[str, Any]] = []
     seen_node: set[str] = set()
+    pdf_path_to_paper: dict[str, str] = {}
 
     def add_node(nid: str, payload: dict[str, Any]) -> None:
         if nid in seen_node:
@@ -121,6 +122,50 @@ def build_corpus_snapshot(
                         },
                     )
                     add_edge(fetch_id, nid, "FETCHED", {"at": created})
+                    if pdf_path:
+                        try:
+                            pdf_path_to_paper[str(Path(pdf_path).resolve())] = nid
+                        except OSError:
+                            pass
+
+    if paths.papers_parsed_dir.is_dir():
+        for mf in sorted(paths.papers_parsed_dir.glob("*.manifest.json")):
+            try:
+                prow = json.loads(mf.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                continue
+            if prow.get("type") != "parse":
+                continue
+            outp, inp = prow.get("output_txt"), prow.get("input_pdf")
+            if not outp or not inp:
+                continue
+            try:
+                out_resolved = str(Path(str(outp)).resolve())
+                in_resolved = str(Path(str(inp)).resolve())
+            except OSError:
+                continue
+            tid = f"parse:{hash(out_resolved) & 0xFFFFFFFFFFFFF:x}"
+            add_node(
+                tid,
+                {
+                    "type": "TextExtract",
+                    "label": Path(outp).stem[:120],
+                    "input_pdf": in_resolved,
+                    "output_txt": out_resolved,
+                    "char_count": prow.get("char_count"),
+                    "pages_total": prow.get("pages_total"),
+                    "pages_read": prow.get("pages_read"),
+                    "manifest_file": str(mf.resolve()),
+                },
+            )
+            paper_nid = pdf_path_to_paper.get(in_resolved)
+            if paper_nid:
+                add_edge(
+                    tid,
+                    paper_nid,
+                    "EXTRACTED_FROM",
+                    {"at": prow.get("created_at", "")},
+                )
 
     if profile_path and profile_path.is_file():
         uid = "user:profile"

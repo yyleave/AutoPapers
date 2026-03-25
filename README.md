@@ -77,7 +77,7 @@ uv run autopapers phase1 run --profile user_profile.json --fetch-first
 # PDF 转文本（需依赖已安装）；可选写入解析清单 JSON
 uv run autopapers papers parse -i ./data/papers/pdfs/some.pdf --write-manifest
 
-# 从检索元数据合并语料快照（Phase 1 → KG MVP）
+# 从检索元数据 + PDF 解析清单合并语料快照（Phase 1 → KG MVP）
 uv run autopapers corpus build
 # 可选：把用户画像里的关键词并入图中
 uv run autopapers corpus build --profile user_profile.json

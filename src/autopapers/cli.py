@@ -315,7 +315,9 @@ def corpus_build(
     ),
 ) -> None:
     """
-    Build data/kg/corpus-snapshot.json from data/papers/metadata/*.json.
+    Build data/kg/corpus-snapshot.json from metadata, fetch records, and parse manifests.
+
+    Incorporates data/papers/metadata/*.json and data/papers/parsed/*.manifest.json.
     """
 
     paths = get_paths()
