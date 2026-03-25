@@ -115,6 +115,51 @@ def test_corpus_build_writes_snapshot_file(tmp_path: Path, monkeypatch: pytest.M
     assert data["node_count"] >= 2
 
 
+def test_corpus_build_with_profile_adds_user_and_keywords(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    meta = tmp_path / "data" / "papers" / "metadata"
+    meta.mkdir(parents=True)
+    (meta / "search-empty.json").write_text(
+        json.dumps(
+            {
+                "type": "search",
+                "created_at": "2026-01-01T00:00:00Z",
+                "provider": "arxiv",
+                "query": "q",
+                "results": [],
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    prof = tmp_path / "prof.json"
+    prof.write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "user": {"display_name": "Carol"},
+                "research_intent": {"keywords": ["topic-a"]},
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    r = CliRunner().invoke(app, ["corpus", "build", "--profile", str(prof)])
+    assert r.exit_code == 0
+    snap = json.loads(
+        (tmp_path / "data" / "kg" / "corpus-snapshot.json").read_text(encoding="utf-8")
+    )
+    types = {n["type"] for n in snap["nodes"]}
+    assert "User" in types
+    assert "Keyword" in types
+    assert any(
+        n.get("type") == "User" and n.get("label") == "Carol" for n in snap["nodes"]
+    )
+
+
 def test_corpus_info_missing_exits(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
     runner = CliRunner()
