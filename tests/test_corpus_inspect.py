@@ -82,6 +82,39 @@ def test_corpus_build_dry_run_skips_write(tmp_path: Path, monkeypatch: pytest.Mo
     assert not snap.is_file()
 
 
+def test_corpus_build_writes_snapshot_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    meta = tmp_path / "data" / "papers" / "metadata"
+    meta.mkdir(parents=True)
+    (meta / "search-one.json").write_text(
+        json.dumps(
+            {
+                "type": "search",
+                "created_at": "2026-01-01T00:00:00Z",
+                "provider": "arxiv",
+                "query": "q",
+                "results": [
+                    {
+                        "source": "arxiv",
+                        "id": "1",
+                        "title": "T",
+                        "pdf_url": None,
+                    }
+                ],
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    r = CliRunner().invoke(app, ["corpus", "build"])
+    assert r.exit_code == 0
+    snap = tmp_path / "data" / "kg" / "corpus-snapshot.json"
+    assert snap.is_file()
+    assert r.stdout.strip() == str(snap.resolve())
+    data = json.loads(snap.read_text(encoding="utf-8"))
+    assert data["node_count"] >= 2
+
+
 def test_corpus_info_missing_exits(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
     runner = CliRunner()
