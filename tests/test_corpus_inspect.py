@@ -15,6 +15,24 @@ from autopapers.phase1.corpus_inspect import (
 )
 
 
+def test_summarize_treats_non_list_nodes_edges_as_empty() -> None:
+    s = summarize_corpus_snapshot({"nodes": "not-a-list", "edges": 42})
+    assert s["node_total"] == 0
+    assert s["edge_total"] == 0
+    assert s["nodes_by_type"] == {}
+    assert s["edges_by_relation"] == {}
+
+
+def test_snapshot_nodes_csv_serializes_object_label_as_json() -> None:
+    data = {
+        "nodes": [{"id": "n1", "type": "Paper", "label": {"en": "Title", "n": 1}}],
+    }
+    csv = snapshot_nodes_to_csv(data)
+    assert "n1" in csv
+    assert "Paper" in csv
+    assert "en" in csv and "Title" in csv
+
+
 def test_summarize_counts_by_type_and_relation() -> None:
     data = {
         "schema_version": "0.1",
