@@ -634,6 +634,52 @@ def proposal_draft(
     typer.echo(str(out))
 
 
+@proposal_app.command("validate")
+def proposal_validate(
+    input: Path = typer.Option(
+        ...,
+        "--input",
+        "-i",
+        exists=True,
+        dir_okay=False,
+        help="Proposal JSON to check",
+    ),
+) -> None:
+    """Validate proposal JSON against schema (read-only; no confirm / no export)."""
+
+    try:
+        raw = json.loads(input.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        typer.echo(
+            json.dumps({"ok": False, "error": "invalid_json", "detail": str(e)}),
+            err=True,
+        )
+        raise typer.Exit(code=1) from e
+
+    prop_schema = load_schema(_proposal_schema_path())
+    try:
+        validate_profile(profile=raw, schema=prop_schema)
+    except ValueError as e:
+        typer.echo(
+            json.dumps({"ok": False, "error": "validation", "detail": str(e)}, indent=2),
+            err=True,
+        )
+        raise typer.Exit(code=1) from e
+
+    typer.echo(
+        json.dumps(
+            {
+                "ok": True,
+                "path": str(input.resolve()),
+                "title": raw.get("title"),
+                "status": raw.get("status"),
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+
+
 @proposal_app.command("confirm")
 def proposal_confirm(
     input: Path = typer.Option(

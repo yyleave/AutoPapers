@@ -104,6 +104,7 @@ uv run autopapers corpus info
 
 # Phase 2 占位：生成/确认 proposal（未指定 --corpus 时会自动用 data/kg/corpus-snapshot.json）
 uv run autopapers proposal draft --profile user_profile.json
+uv run autopapers proposal validate -i ./data/proposals/proposal-draft.json
 uv run autopapers proposal confirm -i ./data/proposals/proposal-draft.json
 
 # 将 proposal JSON 导出为 Markdown（默认与输入同名的 .md）
