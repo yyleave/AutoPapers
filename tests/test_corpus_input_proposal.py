@@ -123,3 +123,46 @@ def test_no_snapshot_returns_empty(tmp_path: Path) -> None:
     text, used = load_corpus_text_for_proposal(paths, None)
     assert used is None
     assert text == ""
+
+
+def test_load_corpus_object_nodes_not_list_returns_truncated_raw(tmp_path: Path) -> None:
+    """JSON object with ``nodes`` not a list is not formatted as a snapshot."""
+
+    paths = get_paths(repo_root=tmp_path)
+    f = tmp_path / "weird.json"
+    body = json.dumps({"schema_version": "0.1", "nodes": {"k": "v"}}, ensure_ascii=False)
+    f.write_text(body, encoding="utf-8")
+    text, used = load_corpus_text_for_proposal(paths, f)
+    assert used == f
+    assert text == body[:MAX_CHARS]
+    assert '"k"' in text
+
+
+def test_load_corpus_json_array_returns_truncated_raw(tmp_path: Path) -> None:
+    paths = get_paths(repo_root=tmp_path)
+    f = tmp_path / "arr.json"
+    raw = '["only","array"]'
+    f.write_text(raw, encoding="utf-8")
+    text, used = load_corpus_text_for_proposal(paths, f)
+    assert used == f
+    assert text == raw
+
+
+def test_format_snapshot_text_extract_missing_file_notes_path(tmp_path: Path) -> None:
+    missing = tmp_path / "not_there.txt"
+    data = {
+        "schema_version": "0.1",
+        "nodes": [
+            {
+                "id": "te:1",
+                "type": "TextExtract",
+                "label": "ghost",
+                "output_txt": str(missing.resolve()),
+            }
+        ],
+        "edges": [],
+    }
+    out = format_snapshot_for_proposal(data)
+    assert "missing file" in out
+    assert "ghost" in out
+    assert "not_there.txt" in out
