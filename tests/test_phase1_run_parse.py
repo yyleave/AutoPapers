@@ -735,6 +735,87 @@ def test_phase1_run_parse_fetched_arxiv_mocked_writes_txt_and_manifest(
     mock_fetch.assert_called_once()
 
 
+@patch.object(AminerProvider, "fetch_pdf")
+@patch("api.aminer_client.AMinerClient")
+def test_phase1_run_parse_fetched_aminer_mocked_writes_txt_and_manifest(
+    mock_client_cls: MagicMock,
+    mock_fetch: MagicMock,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ensure_legacy_api_on_path()
+    from api.aminer_client import Paper
+
+    monkeypatch.chdir(tmp_path)
+    mock_inst = MagicMock()
+    mock_client_cls.return_value = mock_inst
+    ap = Paper(
+        id="aminer-parse-1",
+        title="AM parse",
+        authors=["D"],
+        pdf_url="https://x/y.pdf",
+    )
+    mock_inst.paper_search.return_value = [ap]
+    mock_inst.paper_info.return_value = [ap]
+
+    out_pdf = tmp_path / "data" / "papers" / "pdfs" / "aminer-parse-1.pdf"
+    out_pdf.parent.mkdir(parents=True, exist_ok=True)
+    _tiny_pdf(out_pdf)
+    mock_fetch.return_value = out_pdf
+
+    prof = tmp_path / "p.json"
+    prof.write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "user": {"languages": ["en"]},
+                "background": {"domains": [], "skills": [], "constraints": []},
+                "hardware": {"device": "other"},
+                "research_intent": {
+                    "problem_statements": [],
+                    "keywords": ["aminer-parse-chain"],
+                    "non_goals": [],
+                    "risk_tolerance": "medium",
+                },
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    r = CliRunner().invoke(
+        app,
+        [
+            "phase1",
+            "run",
+            "--profile",
+            str(prof),
+            "--limit",
+            "1",
+            "--fetch-first",
+            "--parse-fetched",
+            "--parse-max-pages",
+            "1",
+        ],
+        env={"AUTOPAPERS_PROVIDER": "aminer"},
+    )
+    assert r.exit_code == 0, r.stdout + r.stderr
+    summary, payload = _two_json_objects(r.stdout)
+    assert summary["count"] == 1
+    assert Path(str(payload["pdf"])).is_file()
+    txt = Path(str(payload["parsed_txt"]))
+    assert txt.name == "aminer-parse-1.txt"
+    assert txt.is_file()
+    man = Path(str(payload["parse_manifest"]))
+    assert man.is_file()
+    man_doc = json.loads(man.read_text(encoding="utf-8"))
+    assert man_doc["type"] == "parse"
+    assert man_doc["input_pdf"] == str(out_pdf.resolve())
+    assert man_doc["pages_read"] >= 1
+    mock_inst.paper_search.assert_called_once_with("aminer-parse-chain", page=0, size=1)
+    mock_inst.paper_info.assert_called_once_with(["aminer-parse-1"])
+    mock_fetch.assert_called_once()
+
+
 def test_phase1_parse_fetched_requires_fetch_first(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
