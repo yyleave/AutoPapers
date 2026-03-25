@@ -7,6 +7,19 @@ from autopapers.config import AppConfig, get_paths
 from autopapers.status_report import build_status
 
 
+def test_build_status_includes_contact_email_when_set(tmp_path: Path) -> None:
+    paths = get_paths(repo_root=tmp_path)
+    r = build_status(
+        paths=paths,
+        cfg=AppConfig(
+            provider="arxiv",
+            log_level="INFO",
+            contact_email="writer@example.org",
+        ),
+    )
+    assert r["config"]["contact_email"] == "writer@example.org"
+
+
 def test_build_status_counts(tmp_path: Path) -> None:
     paths = get_paths(repo_root=tmp_path)
     paths.papers_metadata_dir.mkdir(parents=True)
