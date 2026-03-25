@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+.egg-info/
+.eggs/
+.pytest_cache/
+.ruff_cache/
+.DS_Store
+
+# Local runtime data (FARS-style logs etc. later)
+data/
+

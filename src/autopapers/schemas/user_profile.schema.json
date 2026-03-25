@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/autopapers/schemas/user_profile.schema.json",
+  "title": "AutoPapers User Profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "user", "background", "hardware", "research_intent"],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "user": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["languages"],
+      "properties": {
+        "display_name": { "type": "string" },
+        "languages": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        }
+      }
+    },
+    "background": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["domains", "skills", "constraints"],
+      "properties": {
+        "domains": { "type": "array", "items": { "type": "string" } },
+        "skills": { "type": "array", "items": { "type": "string" } },
+        "constraints": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "hardware": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["device"],
+      "properties": {
+        "device": { "type": "string", "enum": ["mac", "linux", "windows", "other"] },
+        "cpu": { "type": "string" },
+        "gpu": { "type": "string" },
+        "ram_gb": { "type": "number", "minimum": 0 },
+        "storage_gb_free": { "type": "number", "minimum": 0 }
+      }
+    },
+    "research_intent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["problem_statements", "keywords", "non_goals", "risk_tolerance"],
+      "properties": {
+        "problem_statements": { "type": "array", "items": { "type": "string" } },
+        "keywords": { "type": "array", "items": { "type": "string" } },
+        "non_goals": { "type": "array", "items": { "type": "string" } },
+        "risk_tolerance": { "type": "string", "enum": ["low", "medium", "high"] }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "datasets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name"],
+            "properties": {
+              "name": { "type": "string" },
+              "source": { "type": "string" },
+              "license": { "type": "string" },
+              "size": { "type": "string" },
+              "private": { "type": "boolean" }
+            }
+          }
+        },
+        "codebases": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "preferences": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "target_venues": { "type": "array", "items": { "type": "string" } },
+        "output_formats": { "type": "array", "items": { "type": "string" } },
+        "citation_style": { "type": "string" }
+      }
+    }
+  }
+}
+
