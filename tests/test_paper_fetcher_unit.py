@@ -100,3 +100,67 @@ def test_paper_fetcher_fetch_empty_search_returns_empty_list(
         out = fetcher.fetch("ghost query", limit=5, auto_download=True)
     assert out == []
     mock_dl.assert_not_called()
+
+
+def _mock_paper(title: str) -> MagicMock:
+    p = MagicMock()
+    p.title = title
+    p.authors = ["Alice"]
+    p.year = 2024
+    p.venue = "Venue"
+    p.doi = "10.1000/x"
+    p.url = "https://example/paper"
+    return p
+
+
+@patch("paper_fetcher.AMinerClient")
+def test_paper_fetch_auto_download_calls_download_per_paper(
+    mock_client: MagicMock,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from api.pdf_downloader import DownloadResult
+
+    monkeypatch.delenv("AMINER_API_KEY", raising=False)
+    mock_inst = MagicMock()
+    mock_client.return_value = mock_inst
+    mock_inst.search_by_title.return_value = [
+        _mock_paper("First title"),
+        _mock_paper("Second title"),
+    ]
+
+    fetcher = _pf().PaperFetcher(aminer_token="tok", download_dir=str(tmp_path / "dl"))
+    ok = DownloadResult(success=True, filepath="/tmp/a.pdf", source="stub")
+    with patch.object(fetcher, "download_pdf", return_value=ok) as mock_dl:
+        out = fetcher.fetch("q", limit=2, auto_download=True)
+    assert len(out) == 2
+    assert mock_dl.call_count == 2
+    assert mock_dl.call_args_list[0][0][0].title == "First title"
+    assert mock_dl.call_args_list[1][0][0].title == "Second title"
+
+
+@patch("paper_fetcher.AMinerClient")
+def test_paper_fetch_prints_manual_url_on_failed_download(
+    mock_client: MagicMock,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from api.pdf_downloader import DownloadResult
+
+    monkeypatch.delenv("AMINER_API_KEY", raising=False)
+    mock_inst = MagicMock()
+    mock_client.return_value = mock_inst
+    mock_inst.search_by_title.return_value = [_mock_paper("Only")]
+
+    bad = DownloadResult(
+        success=False,
+        error="no pdf",
+        manual_url="https://example/manual",
+    )
+    fetcher = _pf().PaperFetcher(aminer_token="tok", download_dir=str(tmp_path / "dl"))
+    with patch.object(fetcher, "download_pdf", return_value=bad):
+        fetcher.fetch("q", limit=1, auto_download=True)
+    captured = capsys.readouterr().out
+    assert "✗" in captured
+    assert "https://example/manual" in captured

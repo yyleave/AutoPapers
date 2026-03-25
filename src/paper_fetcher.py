@@ -111,8 +111,8 @@ class PaperFetcher:
                     print(f"  ✓ {result.source}: {result.filepath}")
                 else:
                     print(f"  ✗ {result.error}")
-                    if result.url:
-                        print(f"  手动: {result.url}")
+                    if result.manual_url:
+                        print(f"  手动: {result.manual_url}")
 
         return papers
 
