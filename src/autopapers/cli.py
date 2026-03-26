@@ -218,6 +218,11 @@ def cmd_run_all(
         "--full-flow",
         help="Also run phase3 execution stub and phase4 manuscript/bundle scaffold",
     ),
+    archive: bool = typer.Option(
+        True,
+        "--archive/--no-archive",
+        help="With --full-flow, also create submission-package.tar.gz archive",
+    ),
 ) -> None:
     """
     One-shot MVP chain:
@@ -304,6 +309,7 @@ def cmd_run_all(
     experiment_path: Path | None = None
     manuscript_path: Path | None = None
     bundle_dir: Path | None = None
+    archive_path: Path | None = None
     if full_flow:
         exp_dir = paths.data_dir / "experiments"
         exp_dir.mkdir(parents=True, exist_ok=True)
@@ -376,6 +382,11 @@ def cmd_run_all(
             + "\n",
             encoding="utf-8",
         )
+        if archive:
+            archive_path = paths.data_dir / "submissions" / "submission-package.tar.gz"
+            archive_path.parent.mkdir(parents=True, exist_ok=True)
+            with tarfile.open(archive_path, "w:gz") as tf:
+                tf.add(bundle_dir, arcname=bundle_dir.name)
 
     typer.echo(
         json.dumps(
@@ -400,11 +411,42 @@ def cmd_run_all(
                 if manuscript_path
                 else None,
                 "submission_bundle": str(bundle_dir.resolve()) if bundle_dir else None,
+                "submission_archive": str(archive_path.resolve()) if archive_path else None,
                 "status": build_status(),
             },
             ensure_ascii=False,
             indent=2,
         )
+    )
+
+
+@app.command("publish")
+def cmd_publish(
+    profile: Path = typer.Option(
+        ...,
+        "--profile",
+        "-p",
+        exists=True,
+        dir_okay=False,
+        help="Validated user profile JSON",
+    ),
+    title: str = typer.Option("Research direction", "--title", "-t"),
+    limit: int = typer.Option(3, "--limit", "-l", help="Search result count"),
+    parse_max_pages: int = typer.Option(
+        20,
+        "--parse-max-pages",
+        help="Max pages when parsing fetched PDF (0 = all pages)",
+    ),
+) -> None:
+    """One-command full pipeline to submission archive (MVP scaffold)."""
+
+    cmd_run_all(
+        profile=profile,
+        title=title,
+        limit=limit,
+        parse_max_pages=parse_max_pages,
+        full_flow=True,
+        archive=True,
     )
 
 

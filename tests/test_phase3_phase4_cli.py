@@ -117,3 +117,4 @@ def test_run_all_full_flow_includes_phase3_phase4_outputs(
     assert Path(out["experiment_report"]).is_file()
     assert Path(out["manuscript_draft"]).is_file()
     assert Path(out["submission_bundle"]).is_dir()
+    assert Path(out["submission_archive"]).is_file()

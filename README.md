@@ -147,6 +147,11 @@ uv run autopapers phase4 submit --bundle-dir ./data/submissions/submission-packa
 
 # 一键全流程（包含 phase3/4 占位产物）
 # uv run autopapers run-all --profile user_profile.json --full-flow
+# 若 run-all 全流程后直接需要归档，可保持默认 archive 或显式 --archive
+# uv run autopapers run-all --profile user_profile.json --full-flow --archive
+
+# 最短全流程入口：直接跑到 submission archive（等价于 run-all --full-flow --archive）
+# uv run autopapers publish --profile user_profile.json --title "My topic"
 
 # Phase5 编排占位：从 confirmed proposal 一键产出 experiment/manuscript/submission bundle
 # uv run autopapers phase5 run --proposal ./data/proposals/proposal-confirmed.json
