@@ -157,6 +157,10 @@ uv run autopapers phase4 submit --bundle-dir ./data/submissions/submission-packa
 # 发布闭环（publish + verify + release-report.json）
 # uv run autopapers release --profile user_profile.json --title "My topic"
 
+# 断点续跑：若已有 proposal-confirmed.json，则从 Phase3+ 继续；否则可传 --profile 自动回退全流程
+# uv run autopapers resume
+# uv run autopapers resume --profile user_profile.json
+
 # Phase5 编排占位：从 confirmed proposal 一键产出 experiment/manuscript/submission bundle
 # uv run autopapers phase5 run --proposal ./data/proposals/proposal-confirmed.json
 # 若不想生成 tar.gz 归档，可显式关闭：--no-archive

@@ -838,6 +838,204 @@ def cmd_release(
     raise typer.Exit(code=1)
 
 
+@app.command("resume")
+def cmd_resume(
+    profile: Path | None = typer.Option(
+        None,
+        "--profile",
+        "-p",
+        exists=True,
+        dir_okay=False,
+        help="Optional profile JSON; used when confirmed proposal is missing",
+    ),
+    verify: bool = typer.Option(
+        True,
+        "--verify/--no-verify",
+        help="Verify bundle/archive integrity after resume run",
+    ),
+) -> None:
+    """
+    Resume pipeline from existing artifacts.
+
+    Priority:
+    1) if data/proposals/proposal-confirmed.json exists, continue from Phase3+
+    2) else if --profile is provided, run full release pipeline from profile
+    3) otherwise fail with actionable error
+    """
+
+    paths = get_paths()
+    confirmed = paths.proposals_dir / "proposal-confirmed.json"
+    if not confirmed.is_file():
+        if profile is None:
+            typer.echo(
+                json.dumps(
+                    {
+                        "ok": False,
+                        "error": "resume_unavailable",
+                        "detail": "missing proposal-confirmed.json and no --profile provided",
+                    },
+                    indent=2,
+                ),
+                err=True,
+            )
+            raise typer.Exit(code=1)
+        cmd_release(
+            profile=profile,
+            title="Research direction",
+            limit=3,
+            parse_max_pages=20,
+            verify=verify,
+        )
+        return
+
+    # Continue from confirmed proposal (Phase3+ artifacts)
+    try:
+        raw = json.loads(confirmed.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        typer.echo(
+            json.dumps({"ok": False, "error": "invalid_json", "detail": str(e)}),
+            err=True,
+        )
+        raise typer.Exit(code=1) from e
+    prop_schema = load_schema(_proposal_schema_path())
+    try:
+        validate_profile(profile=raw, schema=prop_schema)
+    except ValueError as e:
+        typer.echo(
+            json.dumps({"ok": False, "error": "validation", "detail": str(e)}, indent=2),
+            err=True,
+        )
+        raise typer.Exit(code=1) from e
+    if raw.get("status") != "confirmed":
+        typer.echo(
+            json.dumps(
+                {
+                    "ok": False,
+                    "error": "invalid_status",
+                    "detail": "proposal status must be confirmed",
+                    "status": raw.get("status"),
+                },
+                indent=2,
+            ),
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    exp_out = paths.data_dir / "experiments" / "experiment-report.json"
+    eval_out = paths.data_dir / "experiments" / "evaluation-summary.json"
+    ms_out = paths.data_dir / "manuscripts" / "manuscript-draft.md"
+    bundle_out = paths.data_dir / "submissions" / "submission-package"
+    archive_path = paths.data_dir / "submissions" / "submission-package.tar.gz"
+    exp_out.parent.mkdir(parents=True, exist_ok=True)
+    exp_out.write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "status": "completed_stub",
+                "proposal_title": raw.get("title"),
+                "proposal_path": str(confirmed.resolve()),
+                "summary": "Stub execution finished; replace with real sandbox later.",
+                "metrics": {"primary_metric": "tbd", "value": None},
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    eval_out.write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "status": "evaluated_stub",
+                "from_report": str(exp_out.resolve()),
+                "proposal_title": raw.get("title"),
+                "quality_gate": {
+                    "reproducibility": "pass_stub",
+                    "completeness": "pass_stub",
+                },
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    ms_out.parent.mkdir(parents=True, exist_ok=True)
+    ms_out.write_text(
+        "\n".join(
+            [
+                f"# {raw.get('title', 'Research draft')}",
+                "",
+                "## Abstract",
+                "",
+                "TBD (generated from proposal + experiment report).",
+                "",
+                "## Problem",
+                "",
+                str(raw.get("problem") or ""),
+                "",
+                "## Hypothesis",
+                "",
+                str(raw.get("hypothesis") or ""),
+                "",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    bundle_out.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(confirmed, bundle_out / "proposal-confirmed.json")
+    shutil.copy2(exp_out, bundle_out / "experiment-report.json")
+    shutil.copy2(ms_out, bundle_out / "manuscript-draft.md")
+    (bundle_out / "manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "files": [
+                    "proposal-confirmed.json",
+                    "experiment-report.json",
+                    "manuscript-draft.md",
+                ],
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    if archive_path.is_file():
+        archive_path.unlink()
+    with tarfile.open(archive_path, "w:gz") as tf:
+        tf.add(bundle_out, arcname=bundle_out.name)
+
+    verify_payload: dict[str, object] | None = None
+    ok = True
+    if verify:
+        verify_payload, ok = _verify_submission_assets(
+            bundle_dir=bundle_out,
+            archive=archive_path,
+        )
+
+    payload: dict[str, object] = {
+        "ok": ok,
+        "resumed_from": str(confirmed.resolve()),
+        "experiment_report": str(exp_out.resolve()),
+        "evaluation_summary": str(eval_out.resolve()),
+        "manuscript_draft": str(ms_out.resolve()),
+        "submission_bundle": str(bundle_out.resolve()),
+        "submission_archive": str(archive_path.resolve()) if archive_path.is_file() else None,
+        "verify": verify_payload,
+        "status": build_status(),
+    }
+    if ok:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+        return
+
+    typer.echo(json.dumps(payload, ensure_ascii=False, indent=2), err=True)
+    raise typer.Exit(code=1)
+
+
 @profile_app.command("init")
 def profile_init(
     output: Path = typer.Option(
