@@ -65,6 +65,10 @@ uv sync
 # 环境与数据目录概览（配置、provider、metadata 数量；若存在语料快照则含节点/边统计）
 uv run autopapers status
 
+# 一键跑完整 MVP 链路（profile -> phase1 -> corpus -> proposal -> status）
+# 建议先把 user_profile.json 的 keywords 指向一个本地 PDF 路径（local_pdf provider）
+# uv run autopapers run-all --profile user_profile.json --title "My topic"
+
 # 版本号（与 pyproject 版本一致，需可编辑/安装包）
 uv run autopapers version
 
@@ -130,6 +134,52 @@ uv run autopapers proposal confirm -i ./data/proposals/proposal-draft.json
 # 将 proposal JSON 导出为 Markdown（默认与输入同名的 .md）
 uv run autopapers proposal export -i ./data/proposals/proposal-draft.json
 ```
+
+## 5 分钟跑通 MVP（端到端）
+
+默认推荐先跑离线链路（稳定、可复现）：
+
+```bash
+uv sync
+scripts/mvp_demo.sh --mode offline
+```
+
+如果你希望在离线链路之外追加真实 provider 冒烟（不阻断主流程）：
+
+```bash
+scripts/mvp_demo.sh --mode hybrid
+```
+
+可选参数：
+
+- `--workdir /tmp/my-run`：指定独立输出目录（不污染当前 `data/`）
+- `--mode offline|hybrid`：`offline` 仅本地链路；`hybrid` 末尾会尝试 network smoke
+
+脚本会按顺序执行并输出产物路径：
+
+1. `profile init` + profile 最小字段补齐
+2. `phase1 run --fetch-first --parse-fetched`
+3. `corpus build/info/export-*`
+4. `proposal draft/confirm/export`
+5. `status`
+
+### Network smoke 开关
+
+- 测试默认由 pytest 配置排除：`-m "not network"`。
+- 手动执行在线冒烟：
+
+```bash
+AUTOPAPERS_NETWORK_SMOKE=1 uv run pytest -q -m network \
+  tests/test_papers_arxiv_provider.py::test_arxiv_search_returns_results \
+  tests/test_openalex_provider.py::test_openalex_search_network_smoke
+```
+
+### 常见问题排查
+
+- `snapshot_not_found`：先运行 `uv run autopapers corpus build`。
+- `invalid_json` / `validation`：检查输入 JSON 是否为有效且符合 schema。
+- `phase1 run` 提示参数错误：`--parse-fetched` 必须和 `--fetch-first` 同时使用。
+- hybrid 模式网络冒烟失败：通常是外网连通性或上游 API 波动，离线 MVP 不受影响。
 
 **Legacy**：`src/paper_fetcher.py` 与 `src/api/` 为早期脚本，仍以 `python src/paper_fetcher.py`（仓库根目录）等方式可用；脚本会将 `src/` 注入 `sys.path`，便于未安装可编辑包时导入 `api`。新开发请以 `autopapers` 为准。
 

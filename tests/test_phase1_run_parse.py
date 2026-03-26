@@ -983,6 +983,9 @@ def test_phase1_parse_fetched_requires_fetch_first(
         env={"AUTOPAPERS_PROVIDER": "local_pdf"},
     )
     assert r.exit_code == 1
+    err = json.loads(r.stderr.strip())
+    assert err["error"] == "invalid_args"
+    assert "--parse-fetched requires --fetch-first" in err["detail"]
 
 
 def test_phase1_parse_fetched_writes_parsed(

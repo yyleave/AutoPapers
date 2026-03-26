@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -136,3 +137,17 @@ def test_openalex_pick_pdf_open_access_pdf_suffix_only() -> None:
 
 def test_openalex_pick_pdf_empty() -> None:
     assert _pick_pdf_url({}) is None
+
+
+@pytest.mark.network
+def test_openalex_search_network_smoke() -> None:
+    if os.environ.get("AUTOPAPERS_NETWORK_SMOKE", "").strip().lower() not in {
+        "1",
+        "true",
+        "yes",
+    }:
+        pytest.skip("Set AUTOPAPERS_NETWORK_SMOKE=1 to run provider network smoke tests")
+    refs = OpenAlexProvider().search(query="transformer", limit=1)
+    assert len(refs) <= 1
+    if refs:
+        assert refs[0].id

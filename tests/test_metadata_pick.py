@@ -151,3 +151,34 @@ def test_show_metadata_cli_explicit_path_ok(
     out = json.loads(r.stdout)
     assert out["file"] == str(f.resolve())
     assert out["data"]["query"] == "explicit-path"
+
+
+def test_show_metadata_cli_rejects_missing_selector_pair(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from typer.testing import CliRunner
+
+    from autopapers.cli import app
+
+    monkeypatch.chdir(tmp_path)
+    r = CliRunner().invoke(app, ["papers", "show-metadata"])
+    assert r.exit_code == 1
+    err = json.loads(r.stderr.strip())
+    assert err["error"] == "invalid_args"
+
+
+def test_show_metadata_cli_rejects_invalid_latest_value(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from typer.testing import CliRunner
+
+    from autopapers.cli import app
+
+    monkeypatch.chdir(tmp_path)
+    r = CliRunner().invoke(app, ["papers", "show-metadata", "--latest", "weird"])
+    assert r.exit_code == 1
+    err = json.loads(r.stderr.strip())
+    assert err["error"] == "invalid_latest"
+    assert err["latest"] == "weird"

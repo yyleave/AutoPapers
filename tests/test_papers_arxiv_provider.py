@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -55,6 +56,12 @@ def test_arxiv_id_from_entry_abs_url() -> None:
 
 @pytest.mark.network
 def test_arxiv_search_returns_results() -> None:
+    if os.environ.get("AUTOPAPERS_NETWORK_SMOKE", "").strip().lower() not in {
+        "1",
+        "true",
+        "yes",
+    }:
+        pytest.skip("Set AUTOPAPERS_NETWORK_SMOKE=1 to run provider network smoke tests")
     provider = ArxivProvider()
     refs = provider.search(query="transformer", limit=1)
     assert len(refs) <= 1

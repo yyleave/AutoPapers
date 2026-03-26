@@ -185,6 +185,130 @@ def cmd_providers() -> None:
     typer.echo(json.dumps({"providers": rows}, ensure_ascii=False, indent=2))
 
 
+@app.command("run-all")
+def cmd_run_all(
+    profile: Path = typer.Option(
+        ...,
+        "--profile",
+        "-p",
+        exists=True,
+        dir_okay=False,
+        help="Validated user profile JSON",
+    ),
+    title: str = typer.Option("Research direction", "--title", "-t"),
+    limit: int = typer.Option(3, "--limit", "-l", help="Search result count"),
+    parse_max_pages: int = typer.Option(
+        20,
+        "--parse-max-pages",
+        help="Max pages when parsing fetched PDF (0 = all pages)",
+    ),
+) -> None:
+    """
+    One-shot MVP chain:
+    profile -> phase1(search/fetch/parse first) -> corpus build
+    -> proposal draft/confirm/export -> status.
+    """
+
+    schema_path = _schema_path()
+    data = load_profile_from_json(profile)
+    validate_profile(profile=data, schema=load_schema(schema_path))
+
+    keywords = list(data.get("research_intent", {}).get("keywords") or [])
+    problems = list(data.get("research_intent", {}).get("problem_statements") or [])
+    if keywords:
+        query = " ".join(str(k) for k in keywords[:8])
+    elif problems:
+        query = str(problems[0])
+    else:
+        query = "machine learning"
+
+    provider_name, reg = _provider()
+    prov = reg.get(provider_name)
+    paths = get_paths()
+
+    refs = prov.search(query=query, limit=limit)
+    search_meta = write_search_record(paths, provider=provider_name, query=query, refs=refs)
+
+    fetched_pdf: Path | None = None
+    fetch_meta: Path | None = None
+    parsed_txt: Path | None = None
+    parse_manifest: Path | None = None
+    if refs:
+        r0 = refs[0]
+        fetched_pdf = prov.fetch_pdf(ref=r0, dest_dir=paths.papers_pdfs_dir)
+        fetch_meta = write_fetch_record(
+            paths,
+            source=r0.source,
+            paper_id=r0.id,
+            title=r0.title,
+            pdf_path=fetched_pdf,
+        )
+        paths.papers_parsed_dir.mkdir(parents=True, exist_ok=True)
+        parsed_txt = paths.papers_parsed_dir / f"{fetched_pdf.stem}.txt"
+        page_limit = None if parse_max_pages == 0 else parse_max_pages
+        text, pages_total, pages_read = extract_and_save_txt(
+            fetched_pdf, parsed_txt, max_pages=page_limit
+        )
+        parse_manifest = write_parse_manifest(
+            pdf_path=fetched_pdf,
+            txt_path=parsed_txt,
+            char_count=len(text),
+            pages_total=pages_total,
+            pages_read=pages_read,
+            max_pages_config=parse_max_pages,
+        )
+
+    snap = build_corpus_snapshot(paths, profile_path=profile)
+    snapshot_path = write_corpus_snapshot(paths, snap)
+
+    prof_summary = json.dumps(
+        data.get("research_intent", {}),
+        ensure_ascii=False,
+    )[:1200]
+    corpus_summary, _ = load_corpus_text_for_proposal(paths, snapshot_path)
+    debate = run_debate_stub(profile_summary=prof_summary, corpus_summary=corpus_summary)
+    proposal = merge_stub_to_proposal(title=title, debate=debate, status="draft")
+    prop_schema = load_schema(_proposal_schema_path())
+    validate_profile(profile=proposal, schema=prop_schema)
+
+    paths.proposals_dir.mkdir(parents=True, exist_ok=True)
+    draft_path = paths.proposals_dir / "proposal-draft.json"
+    draft_path.write_text(
+        json.dumps(proposal, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+    proposal["status"] = "confirmed"
+    validate_profile(profile=proposal, schema=prop_schema)
+    confirmed_path = paths.proposals_dir / "proposal-confirmed.json"
+    confirmed_path.write_text(
+        json.dumps(proposal, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+    md_path = confirmed_path.with_suffix(".md")
+    md_path.write_text(proposal_to_markdown(proposal), encoding="utf-8")
+
+    typer.echo(
+        json.dumps(
+            {
+                "ok": True,
+                "provider": provider_name,
+                "query": query,
+                "search_count": len(refs),
+                "search_metadata": str(search_meta.resolve()),
+                "fetch_metadata": str(fetch_meta.resolve()) if fetch_meta else None,
+                "pdf": str(fetched_pdf.resolve()) if fetched_pdf else None,
+                "parsed_txt": str(parsed_txt.resolve()) if parsed_txt else None,
+                "parse_manifest": str(parse_manifest.resolve()) if parse_manifest else None,
+                "corpus_snapshot": str(snapshot_path.resolve()),
+                "proposal_draft": str(draft_path.resolve()),
+                "proposal_confirmed": str(confirmed_path.resolve()),
+                "proposal_markdown": str(md_path.resolve()),
+                "status": build_status(),
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+
+
 @profile_app.command("init")
 def profile_init(
     output: Path = typer.Option(
@@ -363,10 +487,29 @@ def papers_show_metadata(
     """Pretty-print one metadata JSON (--path or --latest, not both)."""
 
     if (path is None) == (latest is None):
-        typer.echo("Provide exactly one of --path or --latest", err=True)
+        typer.echo(
+            json.dumps(
+                {
+                    "error": "invalid_args",
+                    "detail": "Provide exactly one of --path or --latest",
+                },
+                indent=2,
+            ),
+            err=True,
+        )
         raise typer.Exit(code=1)
     if latest is not None and latest not in ("search", "fetch", "any"):
-        typer.echo("--latest must be one of: search, fetch, any", err=True)
+        typer.echo(
+            json.dumps(
+                {
+                    "error": "invalid_latest",
+                    "detail": "--latest must be one of: search, fetch, any",
+                    "latest": latest,
+                },
+                indent=2,
+            ),
+            err=True,
+        )
         raise typer.Exit(code=1)
 
     paths = get_paths()
@@ -579,7 +722,16 @@ def phase1_run(
     """
 
     if parse_fetched and not fetch_first:
-        typer.echo("Error: --parse-fetched requires --fetch-first", err=True)
+        typer.echo(
+            json.dumps(
+                {
+                    "error": "invalid_args",
+                    "detail": "--parse-fetched requires --fetch-first",
+                },
+                indent=2,
+            ),
+            err=True,
+        )
         raise typer.Exit(code=1)
 
     schema_path = _schema_path()
