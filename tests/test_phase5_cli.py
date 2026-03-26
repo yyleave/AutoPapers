@@ -33,7 +33,9 @@ def test_phase5_run_writes_all_outputs(
     bundle = Path(out["submission_bundle"])
     assert bundle.is_dir()
     assert (bundle / "manifest.json").is_file()
+    assert Path(out["submission_archive"]).is_file()
     assert out["status"]["data"]["submission_bundle_exists"] is True
+    assert out["status"]["data"]["submission_archive_exists"] is True
 
 
 def test_phase5_run_rejects_non_confirmed(
@@ -49,3 +51,20 @@ def test_phase5_run_rejects_non_confirmed(
     assert r.exit_code == 1
     err = json.loads(r.stderr.strip())
     assert err["error"] == "invalid_status"
+
+
+def test_phase5_run_no_archive_option(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    proposal = tmp_path / "data" / "proposals" / "proposal-confirmed.json"
+    _confirmed(proposal)
+    r = CliRunner().invoke(
+        app,
+        ["phase5", "run", "--proposal", str(proposal), "--no-archive"],
+    )
+    assert r.exit_code == 0
+    out = json.loads(r.stdout)
+    assert out["submission_archive"] is None
+    assert out["status"]["data"]["submission_archive_exists"] is False

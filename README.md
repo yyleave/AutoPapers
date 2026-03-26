@@ -143,12 +143,14 @@ uv run autopapers phase4 bundle \
   --proposal ./data/proposals/proposal-confirmed.json \
   --experiment ./data/experiments/experiment-report.json \
   --manuscript ./data/manuscripts/manuscript-draft.md
+uv run autopapers phase4 submit --bundle-dir ./data/submissions/submission-package
 
 # 一键全流程（包含 phase3/4 占位产物）
 # uv run autopapers run-all --profile user_profile.json --full-flow
 
 # Phase5 编排占位：从 confirmed proposal 一键产出 experiment/manuscript/submission bundle
 # uv run autopapers phase5 run --proposal ./data/proposals/proposal-confirmed.json
+# 若不想生成 tar.gz 归档，可显式关闭：--no-archive
 ```
 
 ## 5 分钟跑通 MVP（端到端）
