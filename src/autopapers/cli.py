@@ -131,6 +131,59 @@ def _load_corpus_snapshot_for_cli(
     return path, data
 
 
+def _verify_submission_assets(
+    *,
+    bundle_dir: Path,
+    archive: Path | None,
+) -> tuple[dict[str, object], bool]:
+    required_files = [
+        "proposal-confirmed.json",
+        "experiment-report.json",
+        "manuscript-draft.md",
+        "manifest.json",
+    ]
+    missing = [name for name in required_files if not (bundle_dir / name).is_file()]
+    ok = not missing
+
+    payload: dict[str, object] = {
+        "bundle_dir": str(bundle_dir.resolve()),
+        "missing": missing,
+    }
+    if archive is not None:
+        if not archive.is_file():
+            payload["archive"] = {
+                "ok": False,
+                "error": "archive_not_found",
+                "path": str(archive),
+            }
+            ok = False
+        else:
+            try:
+                with tarfile.open(archive, "r:gz") as tf:
+                    names = tf.getnames()
+                present = {
+                    name: any(n.endswith(f"submission-package/{name}") for n in names)
+                    for name in required_files
+                }
+                a_missing = [k for k, v in present.items() if not v]
+                payload["archive"] = {
+                    "ok": len(a_missing) == 0,
+                    "path": str(archive.resolve()),
+                    "missing": a_missing,
+                }
+                if a_missing:
+                    ok = False
+            except tarfile.TarError as e:
+                payload["archive"] = {
+                    "ok": False,
+                    "error": "invalid_archive",
+                    "detail": str(e),
+                    "path": str(archive),
+                }
+                ok = False
+    return payload, ok
+
+
 @app.command("status")
 def cmd_status() -> None:
     """
@@ -448,6 +501,224 @@ def cmd_publish(
         full_flow=True,
         archive=True,
     )
+
+
+@app.command("release")
+def cmd_release(
+    profile: Path = typer.Option(
+        ...,
+        "--profile",
+        "-p",
+        exists=True,
+        dir_okay=False,
+        help="Validated user profile JSON",
+    ),
+    title: str = typer.Option("Research direction", "--title", "-t"),
+    limit: int = typer.Option(3, "--limit", "-l", help="Search result count"),
+    parse_max_pages: int = typer.Option(
+        20,
+        "--parse-max-pages",
+        help="Max pages when parsing fetched PDF (0 = all pages)",
+    ),
+    verify: bool = typer.Option(
+        True,
+        "--verify/--no-verify",
+        help="Verify bundle/archive integrity and write release-report.json",
+    ),
+) -> None:
+    """Run publish pipeline and emit release report for downstream delivery."""
+
+    schema_path = _schema_path()
+    data = load_profile_from_json(profile)
+    validate_profile(profile=data, schema=load_schema(schema_path))
+
+    provider_name, reg = _provider()
+    prov = reg.get(provider_name)
+    paths = get_paths()
+
+    keywords = list(data.get("research_intent", {}).get("keywords") or [])
+    problems = list(data.get("research_intent", {}).get("problem_statements") or [])
+    if keywords:
+        query = " ".join(str(k) for k in keywords[:8])
+    elif problems:
+        query = str(problems[0])
+    else:
+        query = "machine learning"
+
+    refs = prov.search(query=query, limit=limit)
+    search_meta = write_search_record(paths, provider=provider_name, query=query, refs=refs)
+
+    fetched_pdf: Path | None = None
+    fetch_meta: Path | None = None
+    parsed_txt: Path | None = None
+    parse_manifest: Path | None = None
+    if refs:
+        r0 = refs[0]
+        fetched_pdf = prov.fetch_pdf(ref=r0, dest_dir=paths.papers_pdfs_dir)
+        fetch_meta = write_fetch_record(
+            paths,
+            source=r0.source,
+            paper_id=r0.id,
+            title=r0.title,
+            pdf_path=fetched_pdf,
+        )
+        paths.papers_parsed_dir.mkdir(parents=True, exist_ok=True)
+        parsed_txt = paths.papers_parsed_dir / f"{fetched_pdf.stem}.txt"
+        page_limit = None if parse_max_pages == 0 else parse_max_pages
+        text, pages_total, pages_read = extract_and_save_txt(
+            fetched_pdf, parsed_txt, max_pages=page_limit
+        )
+        parse_manifest = write_parse_manifest(
+            pdf_path=fetched_pdf,
+            txt_path=parsed_txt,
+            char_count=len(text),
+            pages_total=pages_total,
+            pages_read=pages_read,
+            max_pages_config=parse_max_pages,
+        )
+
+    snap = build_corpus_snapshot(paths, profile_path=profile)
+    snapshot_path = write_corpus_snapshot(paths, snap)
+
+    prof_summary = json.dumps(
+        data.get("research_intent", {}),
+        ensure_ascii=False,
+    )[:1200]
+    corpus_summary, _ = load_corpus_text_for_proposal(paths, snapshot_path)
+    debate = run_debate_stub(profile_summary=prof_summary, corpus_summary=corpus_summary)
+    proposal = merge_stub_to_proposal(title=title, debate=debate, status="draft")
+    prop_schema = load_schema(_proposal_schema_path())
+    validate_profile(profile=proposal, schema=prop_schema)
+
+    paths.proposals_dir.mkdir(parents=True, exist_ok=True)
+    draft_path = paths.proposals_dir / "proposal-draft.json"
+    draft_path.write_text(
+        json.dumps(proposal, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+    proposal["status"] = "confirmed"
+    validate_profile(profile=proposal, schema=prop_schema)
+    confirmed_path = paths.proposals_dir / "proposal-confirmed.json"
+    confirmed_path.write_text(
+        json.dumps(proposal, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+    md_path = confirmed_path.with_suffix(".md")
+    md_path.write_text(proposal_to_markdown(proposal), encoding="utf-8")
+
+    exp_out = paths.data_dir / "experiments" / "experiment-report.json"
+    ms_out = paths.data_dir / "manuscripts" / "manuscript-draft.md"
+    bundle_out = paths.data_dir / "submissions" / "submission-package"
+    archive_out = paths.data_dir / "submissions" / "submission-package.tar.gz"
+
+    exp_out.parent.mkdir(parents=True, exist_ok=True)
+    exp_out.write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "status": "completed_stub",
+                "proposal_title": proposal.get("title"),
+                "proposal_path": str(confirmed_path.resolve()),
+                "summary": "Stub execution finished; replace with real sandbox later.",
+                "metrics": {"primary_metric": "tbd", "value": None},
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    ms_out.parent.mkdir(parents=True, exist_ok=True)
+    ms_out.write_text(
+        "\n".join(
+            [
+                f"# {proposal.get('title', 'Research draft')}",
+                "",
+                "## Abstract",
+                "",
+                "TBD (generated from proposal + experiment report).",
+                "",
+                "## Problem",
+                "",
+                str(proposal.get("problem") or ""),
+                "",
+                "## Hypothesis",
+                "",
+                str(proposal.get("hypothesis") or ""),
+                "",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    bundle_out.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(confirmed_path, bundle_out / "proposal-confirmed.json")
+    shutil.copy2(exp_out, bundle_out / "experiment-report.json")
+    shutil.copy2(ms_out, bundle_out / "manuscript-draft.md")
+    (bundle_out / "manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "files": [
+                    "proposal-confirmed.json",
+                    "experiment-report.json",
+                    "manuscript-draft.md",
+                ],
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    if archive_out.is_file():
+        archive_out.unlink()
+    with tarfile.open(archive_out, "w:gz") as tf:
+        tf.add(bundle_out, arcname=bundle_out.name)
+
+    verify_payload: dict[str, object] | None = None
+    verify_ok = True
+    if verify:
+        verify_payload, verify_ok = _verify_submission_assets(
+            bundle_dir=bundle_out,
+            archive=archive_out,
+        )
+
+    release_report = {
+        "schema_version": "0.1",
+        "ok": verify_ok,
+        "provider": provider_name,
+        "query": query,
+        "search_count": len(refs),
+        "search_metadata": str(search_meta.resolve()),
+        "fetch_metadata": str(fetch_meta.resolve()) if fetch_meta else None,
+        "pdf": str(fetched_pdf.resolve()) if fetched_pdf else None,
+        "parsed_txt": str(parsed_txt.resolve()) if parsed_txt else None,
+        "parse_manifest": str(parse_manifest.resolve()) if parse_manifest else None,
+        "proposal_confirmed": str(confirmed_path.resolve()),
+        "proposal_markdown": str(md_path.resolve()),
+        "experiment_report": str(exp_out.resolve()),
+        "manuscript_draft": str(ms_out.resolve()),
+        "submission_bundle": str(bundle_out.resolve()),
+        "submission_archive": str(archive_out.resolve()),
+        "verify": verify_payload,
+    }
+    report_path = paths.data_dir / "releases" / "release-report.json"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(
+        json.dumps(release_report, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    payload = {
+        "ok": verify_ok,
+        "release_report": str(report_path.resolve()),
+        "verify": verify_payload,
+        "status": build_status(),
+    }
+    if verify_ok:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+        return
+
+    typer.echo(json.dumps(payload, ensure_ascii=False, indent=2), err=True)
+    raise typer.Exit(code=1)
 
 
 @profile_app.command("init")

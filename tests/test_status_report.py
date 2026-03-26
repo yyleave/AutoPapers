@@ -107,6 +107,7 @@ def test_build_status_phase3_phase4_flags(tmp_path: Path) -> None:
     assert r0["data"]["manuscript_draft_exists"] is False
     assert r0["data"]["submission_bundle_exists"] is False
     assert r0["data"]["submission_archive_exists"] is False
+    assert r0["data"]["release_report_exists"] is False
 
     exp.parent.mkdir(parents=True, exist_ok=True)
     ms.parent.mkdir(parents=True, exist_ok=True)
@@ -114,9 +115,12 @@ def test_build_status_phase3_phase4_flags(tmp_path: Path) -> None:
     exp.write_text("{}", encoding="utf-8")
     ms.write_text("# draft\n", encoding="utf-8")
     (paths.data_dir / "submissions" / "submission-package.tar.gz").write_bytes(b"gz")
+    (paths.data_dir / "releases" / "release-report.json").parent.mkdir(parents=True, exist_ok=True)
+    (paths.data_dir / "releases" / "release-report.json").write_text("{}", encoding="utf-8")
 
     r1 = build_status(paths=paths)
     assert r1["data"]["experiment_report_exists"] is True
     assert r1["data"]["manuscript_draft_exists"] is True
     assert r1["data"]["submission_bundle_exists"] is True
     assert r1["data"]["submission_archive_exists"] is True
+    assert r1["data"]["release_report_exists"] is True

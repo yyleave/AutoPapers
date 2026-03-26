@@ -153,6 +153,9 @@ uv run autopapers phase4 submit --bundle-dir ./data/submissions/submission-packa
 # 最短全流程入口：直接跑到 submission archive（等价于 run-all --full-flow --archive）
 # uv run autopapers publish --profile user_profile.json --title "My topic"
 
+# 发布闭环（publish + verify + release-report.json）
+# uv run autopapers release --profile user_profile.json --title "My topic"
+
 # Phase5 编排占位：从 confirmed proposal 一键产出 experiment/manuscript/submission bundle
 # uv run autopapers phase5 run --proposal ./data/proposals/proposal-confirmed.json
 # 若不想生成 tar.gz 归档，可显式关闭：--no-archive

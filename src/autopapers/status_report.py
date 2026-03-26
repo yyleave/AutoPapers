@@ -41,6 +41,7 @@ def build_status(
     manuscript = p.data_dir / "manuscripts" / "manuscript-draft.md"
     submission_bundle = p.data_dir / "submissions" / "submission-package"
     submission_archive = p.data_dir / "submissions" / "submission-package.tar.gz"
+    release_report = p.data_dir / "releases" / "release-report.json"
     cfg_toml = default_toml_path()
 
     corpus_snapshot: dict[str, Any] = {
@@ -91,5 +92,6 @@ def build_status(
             "manuscript_draft_exists": manuscript.is_file(),
             "submission_bundle_exists": submission_bundle.is_dir(),
             "submission_archive_exists": submission_archive.is_file(),
+            "release_report_exists": release_report.is_file(),
         },
     }
