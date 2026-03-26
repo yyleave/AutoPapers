@@ -133,6 +133,19 @@ uv run autopapers proposal confirm -i ./data/proposals/proposal-draft.json
 
 # 将 proposal JSON 导出为 Markdown（默认与输入同名的 .md）
 uv run autopapers proposal export -i ./data/proposals/proposal-draft.json
+
+# Phase 3/4 占位流程：执行报告 -> 论文草稿 -> 投稿打包目录
+uv run autopapers phase3 run --proposal ./data/proposals/proposal-confirmed.json
+uv run autopapers phase4 draft \
+  --proposal ./data/proposals/proposal-confirmed.json \
+  --experiment ./data/experiments/experiment-report.json
+uv run autopapers phase4 bundle \
+  --proposal ./data/proposals/proposal-confirmed.json \
+  --experiment ./data/experiments/experiment-report.json \
+  --manuscript ./data/manuscripts/manuscript-draft.md
+
+# 一键全流程（包含 phase3/4 占位产物）
+# uv run autopapers run-all --profile user_profile.json --full-flow
 ```
 
 ## 5 分钟跑通 MVP（端到端）

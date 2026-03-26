@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
@@ -52,6 +53,12 @@ app.add_typer(proposal_app, name="proposal")
 
 corpus_app = typer.Typer(help="Phase 1: corpus / KG snapshot from metadata")
 app.add_typer(corpus_app, name="corpus")
+
+phase3_app = typer.Typer(help="Phase 3: sandbox execution scaffold")
+app.add_typer(phase3_app, name="phase3")
+
+phase4_app = typer.Typer(help="Phase 4: manuscript draft and submission scaffold")
+app.add_typer(phase4_app, name="phase4")
 
 
 @app.callback()
@@ -202,6 +209,11 @@ def cmd_run_all(
         "--parse-max-pages",
         help="Max pages when parsing fetched PDF (0 = all pages)",
     ),
+    full_flow: bool = typer.Option(
+        False,
+        "--full-flow",
+        help="Also run phase3 execution stub and phase4 manuscript/bundle scaffold",
+    ),
 ) -> None:
     """
     One-shot MVP chain:
@@ -285,6 +297,82 @@ def cmd_run_all(
     md_path = confirmed_path.with_suffix(".md")
     md_path.write_text(proposal_to_markdown(proposal), encoding="utf-8")
 
+    experiment_path: Path | None = None
+    manuscript_path: Path | None = None
+    bundle_dir: Path | None = None
+    if full_flow:
+        exp_dir = paths.data_dir / "experiments"
+        exp_dir.mkdir(parents=True, exist_ok=True)
+        experiment_path = exp_dir / "experiment-report.json"
+        report = {
+            "schema_version": "0.1",
+            "status": "completed_stub",
+            "proposal_title": proposal.get("title"),
+            "proposal_path": str(confirmed_path.resolve()),
+            "summary": "Stub execution finished; replace with real sandbox later.",
+            "metrics": {
+                "primary_metric": "tbd",
+                "value": None,
+            },
+        }
+        experiment_path.write_text(
+            json.dumps(report, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+
+        ms_dir = paths.data_dir / "manuscripts"
+        ms_dir.mkdir(parents=True, exist_ok=True)
+        manuscript_path = ms_dir / "manuscript-draft.md"
+        manuscript_path.write_text(
+            "\n".join(
+                [
+                    f"# {proposal.get('title', 'Research draft')}",
+                    "",
+                    "## Abstract",
+                    "",
+                    "TBD (generated from proposal + experiment report).",
+                    "",
+                    "## Problem",
+                    "",
+                    str(proposal.get("problem") or ""),
+                    "",
+                    "## Hypothesis",
+                    "",
+                    str(proposal.get("hypothesis") or ""),
+                    "",
+                    "## Experiment Snapshot",
+                    "",
+                    "- status: completed_stub",
+                    "- primary_metric: tbd",
+                    "",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        bundle_dir = paths.data_dir / "submissions" / "submission-package"
+        bundle_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(confirmed_path, bundle_dir / "proposal-confirmed.json")
+        shutil.copy2(experiment_path, bundle_dir / "experiment-report.json")
+        shutil.copy2(manuscript_path, bundle_dir / "manuscript-draft.md")
+        (bundle_dir / "manifest.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": "0.1",
+                    "files": [
+                        "proposal-confirmed.json",
+                        "experiment-report.json",
+                        "manuscript-draft.md",
+                    ],
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
     typer.echo(
         json.dumps(
             {
@@ -301,6 +389,13 @@ def cmd_run_all(
                 "proposal_draft": str(draft_path.resolve()),
                 "proposal_confirmed": str(confirmed_path.resolve()),
                 "proposal_markdown": str(md_path.resolve()),
+                "experiment_report": str(experiment_path.resolve())
+                if experiment_path
+                else None,
+                "manuscript_draft": str(manuscript_path.resolve())
+                if manuscript_path
+                else None,
+                "submission_bundle": str(bundle_dir.resolve()) if bundle_dir else None,
                 "status": build_status(),
             },
             ensure_ascii=False,
@@ -1139,3 +1234,199 @@ def proposal_export(
     out = output or input.with_suffix(".md")
     out.write_text(md, encoding="utf-8")
     typer.echo(str(out))
+
+
+@phase3_app.command("run")
+def phase3_run(
+    proposal: Path = typer.Option(
+        Path("data/proposals/proposal-confirmed.json"),
+        "--proposal",
+        "-p",
+        exists=True,
+        dir_okay=False,
+        help="Confirmed proposal JSON path",
+    ),
+    output: Path | None = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Experiment report JSON path (default: data/experiments/experiment-report.json)",
+    ),
+) -> None:
+    """Phase3 stub: generate an execution report from confirmed proposal."""
+
+    try:
+        raw = json.loads(proposal.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        typer.echo(
+            json.dumps({"ok": False, "error": "invalid_json", "detail": str(e)}),
+            err=True,
+        )
+        raise typer.Exit(code=1) from e
+
+    prop_schema = load_schema(_proposal_schema_path())
+    try:
+        validate_profile(profile=raw, schema=prop_schema)
+    except ValueError as e:
+        typer.echo(
+            json.dumps({"ok": False, "error": "validation", "detail": str(e)}, indent=2),
+            err=True,
+        )
+        raise typer.Exit(code=1) from e
+
+    if raw.get("status") != "confirmed":
+        typer.echo(
+            json.dumps(
+                {
+                    "ok": False,
+                    "error": "invalid_status",
+                    "detail": "proposal status must be confirmed",
+                    "status": raw.get("status"),
+                },
+                indent=2,
+            ),
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    paths = get_paths()
+    out = output or (paths.data_dir / "experiments" / "experiment-report.json")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    report = {
+        "schema_version": "0.1",
+        "status": "completed_stub",
+        "proposal_title": raw.get("title"),
+        "proposal_path": str(proposal.resolve()),
+        "summary": "Stub execution finished; replace with real sandbox later.",
+        "metrics": {"primary_metric": "tbd", "value": None},
+    }
+    out.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    typer.echo(str(out.resolve()))
+
+
+@phase4_app.command("draft")
+def phase4_draft(
+    proposal: Path = typer.Option(
+        Path("data/proposals/proposal-confirmed.json"),
+        "--proposal",
+        "-p",
+        exists=True,
+        dir_okay=False,
+        help="Confirmed proposal JSON path",
+    ),
+    experiment: Path = typer.Option(
+        Path("data/experiments/experiment-report.json"),
+        "--experiment",
+        "-e",
+        exists=True,
+        dir_okay=False,
+        help="Experiment report JSON path",
+    ),
+    output: Path | None = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Markdown path (default: data/manuscripts/manuscript-draft.md)",
+    ),
+) -> None:
+    """Phase4 stub: render a manuscript draft from proposal + experiment report."""
+
+    try:
+        prop = json.loads(proposal.read_text(encoding="utf-8"))
+        exp = json.loads(experiment.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        typer.echo(
+            json.dumps({"ok": False, "error": "invalid_json", "detail": str(e)}),
+            err=True,
+        )
+        raise typer.Exit(code=1) from e
+
+    paths = get_paths()
+    out = output or (paths.data_dir / "manuscripts" / "manuscript-draft.md")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    md = "\n".join(
+        [
+            f"# {prop.get('title', 'Research draft')}",
+            "",
+            "## Abstract",
+            "",
+            "TBD (generated from proposal + experiment report).",
+            "",
+            "## Problem",
+            "",
+            str(prop.get("problem") or ""),
+            "",
+            "## Hypothesis",
+            "",
+            str(prop.get("hypothesis") or ""),
+            "",
+            "## Experiment Snapshot",
+            "",
+            f"- status: {exp.get('status', '')}",
+            f"- primary_metric: {exp.get('metrics', {}).get('primary_metric', 'tbd')}",
+            f"- value: {exp.get('metrics', {}).get('value', '')}",
+            "",
+        ]
+    )
+    out.write_text(md + "\n", encoding="utf-8")
+    typer.echo(str(out.resolve()))
+
+
+@phase4_app.command("bundle")
+def phase4_bundle(
+    proposal: Path = typer.Option(
+        Path("data/proposals/proposal-confirmed.json"),
+        "--proposal",
+        "-p",
+        exists=True,
+        dir_okay=False,
+        help="Confirmed proposal JSON path",
+    ),
+    experiment: Path = typer.Option(
+        Path("data/experiments/experiment-report.json"),
+        "--experiment",
+        "-e",
+        exists=True,
+        dir_okay=False,
+        help="Experiment report JSON path",
+    ),
+    manuscript: Path = typer.Option(
+        Path("data/manuscripts/manuscript-draft.md"),
+        "--manuscript",
+        "-m",
+        exists=True,
+        dir_okay=False,
+        help="Manuscript markdown path",
+    ),
+    output_dir: Path | None = typer.Option(
+        None,
+        "--output-dir",
+        "-o",
+        help="Bundle directory (default: data/submissions/submission-package)",
+    ),
+) -> None:
+    """Phase4 stub: package proposal/experiment/manuscript into one submission folder."""
+
+    paths = get_paths()
+    out_dir = output_dir or (paths.data_dir / "submissions" / "submission-package")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(proposal, out_dir / "proposal-confirmed.json")
+    shutil.copy2(experiment, out_dir / "experiment-report.json")
+    shutil.copy2(manuscript, out_dir / "manuscript-draft.md")
+    (out_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "files": [
+                    "proposal-confirmed.json",
+                    "experiment-report.json",
+                    "manuscript-draft.md",
+                ],
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    typer.echo(str(out_dir.resolve()))
