@@ -154,3 +154,59 @@ def test_phase5_verify_fails_on_manifest_content_mismatch(
     err = json.loads(r.stderr.strip())
     assert err["manifest"]["ok"] is False
     assert "experiment-report.json" in err["manifest"]["missing_from_manifest"]
+
+
+def test_phase5_verify_with_release_report_checksum_mismatch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    prof = tmp_path / "user.json"
+    prof.write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "user": {"languages": ["en"]},
+                "background": {"domains": [], "skills": [], "constraints": []},
+                "hardware": {"device": "other"},
+                "research_intent": {
+                    "problem_statements": [],
+                    "keywords": [],
+                    "non_goals": [],
+                    "risk_tolerance": "medium",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    rel = CliRunner().invoke(
+        app,
+        ["release", "--profile", str(prof), "--no-verify"],
+        env={"AUTOPAPERS_PROVIDER": "local_pdf"},
+    )
+    assert rel.exit_code == 0
+    r_out = json.loads(rel.stdout)
+    rr = Path(r_out["release_report"])
+    rr_doc = json.loads(rr.read_text(encoding="utf-8"))
+    rr_doc["checksums"]["proposal-confirmed.json"] = "deadbeef"
+    rr.write_text(json.dumps(rr_doc, ensure_ascii=False, indent=2), encoding="utf-8")
+    bundle = Path(rr_doc["submission_bundle"])
+    archive = Path(rr_doc["submission_archive"])
+
+    v = CliRunner().invoke(
+        app,
+        [
+            "phase5",
+            "verify",
+            "--bundle-dir",
+            str(bundle),
+            "--archive",
+            str(archive),
+            "--release-report",
+            str(rr),
+        ],
+    )
+    assert v.exit_code == 1
+    err = json.loads(v.stderr.strip())
+    assert err["hashes"]["ok"] is False
+    assert "proposal-confirmed.json" in err["hashes"]["mismatch"]

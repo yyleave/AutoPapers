@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -135,6 +136,7 @@ def _verify_submission_assets(
     *,
     bundle_dir: Path,
     archive: Path | None,
+    expected_hashes: dict[str, str] | None = None,
 ) -> tuple[dict[str, object], bool]:
     required_files = [
         "proposal-confirmed.json",
@@ -216,6 +218,32 @@ def _verify_submission_assets(
                     "path": str(archive),
                 }
                 ok = False
+    if expected_hashes is not None:
+        actual_hashes: dict[str, str] = {}
+        hash_mismatch: dict[str, dict[str, str]] = {}
+        file_map = {
+            "proposal-confirmed.json": bundle_dir / "proposal-confirmed.json",
+            "experiment-report.json": bundle_dir / "experiment-report.json",
+            "manuscript-draft.md": bundle_dir / "manuscript-draft.md",
+            "manifest.json": bundle_dir / "manifest.json",
+        }
+        if archive is not None and archive.is_file():
+            file_map["submission-package.tar.gz"] = archive
+        for name, path in file_map.items():
+            if not path.is_file():
+                continue
+            h = hashlib.sha256(path.read_bytes()).hexdigest()
+            actual_hashes[name] = h
+            exp = expected_hashes.get(name)
+            if exp is not None and exp != h:
+                hash_mismatch[name] = {"expected": exp, "actual": h}
+        payload["hashes"] = {
+            "ok": len(hash_mismatch) == 0,
+            "actual": actual_hashes,
+            "mismatch": hash_mismatch,
+        }
+        if hash_mismatch:
+            ok = False
     return payload, ok
 
 
@@ -709,12 +737,21 @@ def cmd_release(
     with tarfile.open(archive_out, "w:gz") as tf:
         tf.add(bundle_out, arcname=bundle_out.name)
 
+    checksums = {
+        "proposal-confirmed.json": hashlib.sha256(confirmed_path.read_bytes()).hexdigest(),
+        "experiment-report.json": hashlib.sha256(exp_out.read_bytes()).hexdigest(),
+        "manuscript-draft.md": hashlib.sha256(ms_out.read_bytes()).hexdigest(),
+        "manifest.json": hashlib.sha256((bundle_out / "manifest.json").read_bytes()).hexdigest(),
+        "submission-package.tar.gz": hashlib.sha256(archive_out.read_bytes()).hexdigest(),
+    }
+
     verify_payload: dict[str, object] | None = None
     verify_ok = True
     if verify:
         verify_payload, verify_ok = _verify_submission_assets(
             bundle_dir=bundle_out,
             archive=archive_out,
+            expected_hashes=checksums,
         )
 
     release_report = {
@@ -734,6 +771,7 @@ def cmd_release(
         "manuscript_draft": str(ms_out.resolve()),
         "submission_bundle": str(bundle_out.resolve()),
         "submission_archive": str(archive_out.resolve()),
+        "checksums": checksums,
         "verify": verify_payload,
     }
     report_path = paths.data_dir / "releases" / "release-report.json"
@@ -1992,9 +2030,46 @@ def phase5_verify(
         "-a",
         help="Optional submission archive to validate against bundle",
     ),
+    release_report: Path | None = typer.Option(
+        None,
+        "--release-report",
+        "-r",
+        exists=True,
+        dir_okay=False,
+        help="Optional release-report.json to verify checksums",
+    ),
 ) -> None:
     """Validate submission package completeness and optional archive consistency."""
-    detail, ok = _verify_submission_assets(bundle_dir=bundle_dir, archive=archive)
+    expected_hashes: dict[str, str] | None = None
+    if release_report is not None:
+        try:
+            rr = json.loads(release_report.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as e:
+            typer.echo(
+                json.dumps({"ok": False, "error": "invalid_json", "detail": str(e)}),
+                err=True,
+            )
+            raise typer.Exit(code=1) from e
+        hashes = rr.get("checksums")
+        if not isinstance(hashes, dict):
+            typer.echo(
+                json.dumps(
+                    {
+                        "ok": False,
+                        "error": "invalid_release_report",
+                        "detail": "release report missing checksums object",
+                    },
+                    indent=2,
+                ),
+                err=True,
+            )
+            raise typer.Exit(code=1)
+        expected_hashes = {str(k): str(v) for k, v in hashes.items()}
+    detail, ok = _verify_submission_assets(
+        bundle_dir=bundle_dir,
+        archive=archive,
+        expected_hashes=expected_hashes,
+    )
     payload: dict[str, object] = {"ok": ok, **detail}
 
     if ok:
