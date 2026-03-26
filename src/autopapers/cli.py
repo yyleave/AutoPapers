@@ -149,6 +149,41 @@ def _verify_submission_assets(
         "bundle_dir": str(bundle_dir.resolve()),
         "missing": missing,
     }
+    manifest_check: dict[str, object] | None = None
+    manifest_path = bundle_dir / "manifest.json"
+    if manifest_path.is_file():
+        try:
+            manifest_obj = json.loads(manifest_path.read_text(encoding="utf-8"))
+            listed = manifest_obj.get("files")
+            listed_set = set(listed) if isinstance(listed, list) else set()
+            expected_set = {
+                "proposal-confirmed.json",
+                "experiment-report.json",
+                "manuscript-draft.md",
+            }
+            manifest_missing = sorted(expected_set - listed_set)
+            manifest_extra = sorted(listed_set - expected_set)
+            manifest_check = {
+                "ok": len(manifest_missing) == 0 and len(manifest_extra) == 0,
+                "missing_from_manifest": manifest_missing,
+                "unexpected_in_manifest": manifest_extra,
+            }
+            if not manifest_check["ok"]:
+                ok = False
+        except json.JSONDecodeError as e:
+            manifest_check = {
+                "ok": False,
+                "error": "invalid_manifest_json",
+                "detail": str(e),
+            }
+            ok = False
+    else:
+        manifest_check = {
+            "ok": False,
+            "error": "manifest_not_found",
+        }
+        ok = False
+    payload["manifest"] = manifest_check
     if archive is not None:
         if not archive.is_file():
             payload["archive"] = {
@@ -1959,53 +1994,8 @@ def phase5_verify(
     ),
 ) -> None:
     """Validate submission package completeness and optional archive consistency."""
-
-    required_files = [
-        "proposal-confirmed.json",
-        "experiment-report.json",
-        "manuscript-draft.md",
-        "manifest.json",
-    ]
-    missing = [name for name in required_files if not (bundle_dir / name).is_file()]
-    ok = not missing
-
-    archive_result: dict[str, object] | None = None
-    if archive is not None:
-        if not archive.is_file():
-            archive_result = {"ok": False, "error": "archive_not_found", "path": str(archive)}
-            ok = False
-        else:
-            try:
-                with tarfile.open(archive, "r:gz") as tf:
-                    names = tf.getnames()
-                present = {
-                    name: any(n.endswith(f"submission-package/{name}") for n in names)
-                    for name in required_files
-                }
-                a_missing = [k for k, v in present.items() if not v]
-                archive_result = {
-                    "ok": len(a_missing) == 0,
-                    "path": str(archive.resolve()),
-                    "missing": a_missing,
-                }
-                if a_missing:
-                    ok = False
-            except tarfile.TarError as e:
-                archive_result = {
-                    "ok": False,
-                    "error": "invalid_archive",
-                    "detail": str(e),
-                    "path": str(archive),
-                }
-                ok = False
-
-    payload: dict[str, object] = {
-        "ok": ok,
-        "bundle_dir": str(bundle_dir.resolve()),
-        "missing": missing,
-    }
-    if archive_result is not None:
-        payload["archive"] = archive_result
+    detail, ok = _verify_submission_assets(bundle_dir=bundle_dir, archive=archive)
+    payload: dict[str, object] = {"ok": ok, **detail}
 
     if ok:
         typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))

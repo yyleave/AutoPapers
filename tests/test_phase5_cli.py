@@ -91,6 +91,7 @@ def test_phase5_verify_ok_with_archive(
     payload = json.loads(verify.stdout)
     assert payload["ok"] is True
     assert payload["missing"] == []
+    assert payload["manifest"]["ok"] is True
     assert payload["archive"]["ok"] is True
 
 
@@ -132,3 +133,24 @@ def test_phase5_verify_fails_on_invalid_archive(
     assert r.exit_code == 1
     err = json.loads(r.stderr.strip())
     assert err["archive"]["error"] == "invalid_archive"
+
+
+def test_phase5_verify_fails_on_manifest_content_mismatch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    bundle = tmp_path / "data" / "submissions" / "submission-package"
+    bundle.mkdir(parents=True, exist_ok=True)
+    (bundle / "proposal-confirmed.json").write_text("{}", encoding="utf-8")
+    (bundle / "experiment-report.json").write_text("{}", encoding="utf-8")
+    (bundle / "manuscript-draft.md").write_text("# draft\n", encoding="utf-8")
+    (bundle / "manifest.json").write_text(
+        json.dumps({"files": ["proposal-confirmed.json"]}),
+        encoding="utf-8",
+    )
+    r = CliRunner().invoke(app, ["phase5", "verify", "--bundle-dir", str(bundle)])
+    assert r.exit_code == 1
+    err = json.loads(r.stderr.strip())
+    assert err["manifest"]["ok"] is False
+    assert "experiment-report.json" in err["manifest"]["missing_from_manifest"]
