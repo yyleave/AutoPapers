@@ -60,6 +60,9 @@ app.add_typer(phase3_app, name="phase3")
 phase4_app = typer.Typer(help="Phase 4: manuscript draft and submission scaffold")
 app.add_typer(phase4_app, name="phase4")
 
+phase5_app = typer.Typer(help="Phase 5: end-to-end orchestration scaffold")
+app.add_typer(phase5_app, name="phase5")
+
 
 @app.callback()
 def _global_options() -> None:
@@ -1430,3 +1433,134 @@ def phase4_bundle(
         encoding="utf-8",
     )
     typer.echo(str(out_dir.resolve()))
+
+
+@phase5_app.command("run")
+def phase5_run(
+    proposal: Path = typer.Option(
+        Path("data/proposals/proposal-confirmed.json"),
+        "--proposal",
+        "-p",
+        exists=True,
+        dir_okay=False,
+        help="Confirmed proposal JSON path",
+    ),
+    full_status: bool = typer.Option(
+        True,
+        "--full-status/--no-full-status",
+        help="Include full status payload in output JSON",
+    ),
+) -> None:
+    """Phase5 scaffold: orchestrate phase3->phase4 draft->phase4 bundle."""
+
+    paths = get_paths()
+
+    exp_out = paths.data_dir / "experiments" / "experiment-report.json"
+    ms_out = paths.data_dir / "manuscripts" / "manuscript-draft.md"
+    bundle_out = paths.data_dir / "submissions" / "submission-package"
+
+    try:
+        raw = json.loads(proposal.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        typer.echo(
+            json.dumps({"ok": False, "error": "invalid_json", "detail": str(e)}),
+            err=True,
+        )
+        raise typer.Exit(code=1) from e
+
+    prop_schema = load_schema(_proposal_schema_path())
+    try:
+        validate_profile(profile=raw, schema=prop_schema)
+    except ValueError as e:
+        typer.echo(
+            json.dumps({"ok": False, "error": "validation", "detail": str(e)}, indent=2),
+            err=True,
+        )
+        raise typer.Exit(code=1) from e
+
+    if raw.get("status") != "confirmed":
+        typer.echo(
+            json.dumps(
+                {
+                    "ok": False,
+                    "error": "invalid_status",
+                    "detail": "proposal status must be confirmed",
+                    "status": raw.get("status"),
+                },
+                indent=2,
+            ),
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    exp_out.parent.mkdir(parents=True, exist_ok=True)
+    report = {
+        "schema_version": "0.1",
+        "status": "completed_stub",
+        "proposal_title": raw.get("title"),
+        "proposal_path": str(proposal.resolve()),
+        "summary": "Stub execution finished; replace with real sandbox later.",
+        "metrics": {"primary_metric": "tbd", "value": None},
+    }
+    exp_out.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    ms_out.parent.mkdir(parents=True, exist_ok=True)
+    ms_out.write_text(
+        "\n".join(
+            [
+                f"# {raw.get('title', 'Research draft')}",
+                "",
+                "## Abstract",
+                "",
+                "TBD (generated from proposal + experiment report).",
+                "",
+                "## Problem",
+                "",
+                str(raw.get("problem") or ""),
+                "",
+                "## Hypothesis",
+                "",
+                str(raw.get("hypothesis") or ""),
+                "",
+                "## Experiment Snapshot",
+                "",
+                "- status: completed_stub",
+                "- primary_metric: tbd",
+                "",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    bundle_out.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(proposal, bundle_out / "proposal-confirmed.json")
+    shutil.copy2(exp_out, bundle_out / "experiment-report.json")
+    shutil.copy2(ms_out, bundle_out / "manuscript-draft.md")
+    (bundle_out / "manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "files": [
+                    "proposal-confirmed.json",
+                    "experiment-report.json",
+                    "manuscript-draft.md",
+                ],
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    payload: dict[str, object] = {
+        "ok": True,
+        "proposal_confirmed": str(proposal.resolve()),
+        "experiment_report": str(exp_out.resolve()),
+        "manuscript_draft": str(ms_out.resolve()),
+        "submission_bundle": str(bundle_out.resolve()),
+    }
+    if full_status:
+        payload["status"] = build_status()
+    typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))

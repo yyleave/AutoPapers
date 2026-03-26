@@ -146,6 +146,9 @@ uv run autopapers phase4 bundle \
 
 # 一键全流程（包含 phase3/4 占位产物）
 # uv run autopapers run-all --profile user_profile.json --full-flow
+
+# Phase5 编排占位：从 confirmed proposal 一键产出 experiment/manuscript/submission bundle
+# uv run autopapers phase5 run --proposal ./data/proposals/proposal-confirmed.json
 ```
 
 ## 5 分钟跑通 MVP（端到端）

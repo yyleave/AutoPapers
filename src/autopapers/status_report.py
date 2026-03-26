@@ -37,6 +37,9 @@ def build_status(
     snap = p.kg_dir / "corpus-snapshot.json"
     draft = p.proposals_dir / "proposal-draft.json"
     confirmed = p.proposals_dir / "proposal-confirmed.json"
+    experiment = p.data_dir / "experiments" / "experiment-report.json"
+    manuscript = p.data_dir / "manuscripts" / "manuscript-draft.md"
+    submission_bundle = p.data_dir / "submissions" / "submission-package"
     cfg_toml = default_toml_path()
 
     corpus_snapshot: dict[str, Any] = {
@@ -83,5 +86,8 @@ def build_status(
             "corpus_snapshot_exists": snap.is_file(),
             "proposal_draft_exists": draft.is_file(),
             "proposal_confirmed_exists": confirmed.is_file(),
+            "experiment_report_exists": experiment.is_file(),
+            "manuscript_draft_exists": manuscript.is_file(),
+            "submission_bundle_exists": submission_bundle.is_dir(),
         },
     }

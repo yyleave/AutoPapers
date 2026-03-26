@@ -94,3 +94,26 @@ def test_build_status_proposal_flags(tmp_path: Path) -> None:
     r2 = build_status(paths=paths)
     assert r2["data"]["proposal_draft_exists"] is True
     assert r2["data"]["proposal_confirmed_exists"] is True
+
+
+def test_build_status_phase3_phase4_flags(tmp_path: Path) -> None:
+    paths = get_paths(repo_root=tmp_path)
+    exp = paths.data_dir / "experiments" / "experiment-report.json"
+    ms = paths.data_dir / "manuscripts" / "manuscript-draft.md"
+    bundle = paths.data_dir / "submissions" / "submission-package"
+
+    r0 = build_status(paths=paths)
+    assert r0["data"]["experiment_report_exists"] is False
+    assert r0["data"]["manuscript_draft_exists"] is False
+    assert r0["data"]["submission_bundle_exists"] is False
+
+    exp.parent.mkdir(parents=True, exist_ok=True)
+    ms.parent.mkdir(parents=True, exist_ok=True)
+    bundle.mkdir(parents=True, exist_ok=True)
+    exp.write_text("{}", encoding="utf-8")
+    ms.write_text("# draft\n", encoding="utf-8")
+
+    r1 = build_status(paths=paths)
+    assert r1["data"]["experiment_report_exists"] is True
+    assert r1["data"]["manuscript_draft_exists"] is True
+    assert r1["data"]["submission_bundle_exists"] is True
