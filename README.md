@@ -156,6 +156,8 @@ uv run autopapers phase4 submit --bundle-dir ./data/submissions/submission-packa
 
 # 发布闭环（publish + verify + release-report.json）
 # uv run autopapers release --profile user_profile.json --title "My topic"
+# 发布后二次验签（读取 release-report 的 checksum 重新核验）
+# uv run autopapers release-verify
 
 # 断点续跑：若已有 proposal-confirmed.json，则从 Phase3+ 继续；否则可传 --profile 自动回退全流程
 # uv run autopapers resume
