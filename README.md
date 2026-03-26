@@ -156,6 +156,8 @@ uv run autopapers phase4 submit --bundle-dir ./data/submissions/submission-packa
 # Phase5 编排占位：从 confirmed proposal 一键产出 experiment/manuscript/submission bundle
 # uv run autopapers phase5 run --proposal ./data/proposals/proposal-confirmed.json
 # 若不想生成 tar.gz 归档，可显式关闭：--no-archive
+# 验证 submission 包与归档一致性
+# uv run autopapers phase5 verify --bundle-dir ./data/submissions/submission-package
 ```
 
 ## 5 分钟跑通 MVP（端到端）

@@ -1668,3 +1668,77 @@ def phase5_run(
     if full_status:
         payload["status"] = build_status()
     typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+
+
+@phase5_app.command("verify")
+def phase5_verify(
+    bundle_dir: Path = typer.Option(
+        Path("data/submissions/submission-package"),
+        "--bundle-dir",
+        "-b",
+        exists=True,
+        file_okay=False,
+        help="Submission package directory to validate",
+    ),
+    archive: Path | None = typer.Option(
+        Path("data/submissions/submission-package.tar.gz"),
+        "--archive",
+        "-a",
+        help="Optional submission archive to validate against bundle",
+    ),
+) -> None:
+    """Validate submission package completeness and optional archive consistency."""
+
+    required_files = [
+        "proposal-confirmed.json",
+        "experiment-report.json",
+        "manuscript-draft.md",
+        "manifest.json",
+    ]
+    missing = [name for name in required_files if not (bundle_dir / name).is_file()]
+    ok = not missing
+
+    archive_result: dict[str, object] | None = None
+    if archive is not None:
+        if not archive.is_file():
+            archive_result = {"ok": False, "error": "archive_not_found", "path": str(archive)}
+            ok = False
+        else:
+            try:
+                with tarfile.open(archive, "r:gz") as tf:
+                    names = tf.getnames()
+                present = {
+                    name: any(n.endswith(f"submission-package/{name}") for n in names)
+                    for name in required_files
+                }
+                a_missing = [k for k, v in present.items() if not v]
+                archive_result = {
+                    "ok": len(a_missing) == 0,
+                    "path": str(archive.resolve()),
+                    "missing": a_missing,
+                }
+                if a_missing:
+                    ok = False
+            except tarfile.TarError as e:
+                archive_result = {
+                    "ok": False,
+                    "error": "invalid_archive",
+                    "detail": str(e),
+                    "path": str(archive),
+                }
+                ok = False
+
+    payload: dict[str, object] = {
+        "ok": ok,
+        "bundle_dir": str(bundle_dir.resolve()),
+        "missing": missing,
+    }
+    if archive_result is not None:
+        payload["archive"] = archive_result
+
+    if ok:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+        return
+
+    typer.echo(json.dumps(payload, ensure_ascii=False, indent=2), err=True)
+    raise typer.Exit(code=1)
