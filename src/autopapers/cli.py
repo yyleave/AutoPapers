@@ -256,6 +256,86 @@ def cmd_status() -> None:
     typer.echo(json.dumps(build_status(), ensure_ascii=False, indent=2))
 
 
+@app.command("flow")
+def cmd_flow() -> None:
+    """
+    Print high-level workflow stage completion and suggested next commands.
+    """
+
+    st = build_status()
+    d = st.get("data", {})
+    phase1_done = bool(d.get("metadata_json")) and bool(d.get("corpus_snapshot_exists"))
+    phase2_done = bool(d.get("proposal_confirmed_exists"))
+    phase3_done = bool(d.get("experiment_report_exists")) and bool(
+        d.get("evaluation_summary_exists")
+    )
+    phase4_done = bool(d.get("manuscript_draft_exists")) and bool(d.get("submission_bundle_exists"))
+    phase5_done = bool(d.get("submission_archive_exists"))
+    release_done = bool(d.get("release_report_exists"))
+
+    next_steps: list[str] = []
+    if not phase1_done:
+        next_steps.append(
+            "uv run autopapers phase1 run --profile user_profile.json "
+            "--fetch-first --parse-fetched"
+        )
+        next_steps.append("uv run autopapers corpus build --profile user_profile.json")
+    elif not phase2_done:
+        next_steps.append("uv run autopapers proposal draft --profile user_profile.json")
+        next_steps.append(
+            "uv run autopapers proposal confirm "
+            "-i ./data/proposals/proposal-draft.json"
+        )
+    elif not phase3_done:
+        next_steps.append(
+            "uv run autopapers phase3 run "
+            "--proposal ./data/proposals/proposal-confirmed.json"
+        )
+        next_steps.append(
+            "uv run autopapers phase3 evaluate "
+            "--report ./data/experiments/experiment-report.json"
+        )
+    elif not phase4_done:
+        next_steps.append(
+            "uv run autopapers phase4 draft "
+            "--proposal ./data/proposals/proposal-confirmed.json "
+            "--experiment ./data/experiments/experiment-report.json"
+        )
+        next_steps.append(
+            "uv run autopapers phase4 bundle "
+            "--proposal ./data/proposals/proposal-confirmed.json "
+            "--experiment ./data/experiments/experiment-report.json "
+            "--manuscript ./data/manuscripts/manuscript-draft.md"
+        )
+    elif not phase5_done:
+        next_steps.append(
+            "uv run autopapers phase4 submit "
+            "--bundle-dir ./data/submissions/submission-package"
+        )
+        next_steps.append(
+            "uv run autopapers phase5 verify "
+            "--bundle-dir ./data/submissions/submission-package"
+        )
+    elif not release_done:
+        next_steps.append("uv run autopapers release --profile user_profile.json")
+    else:
+        next_steps.append(
+            "All stages completed. Re-run with "
+            "`uv run autopapers resume` to refresh artifacts."
+        )
+
+    payload = {
+        "phase1_data": phase1_done,
+        "phase2_proposal": phase2_done,
+        "phase3_experiment": phase3_done,
+        "phase4_manuscript_bundle": phase4_done,
+        "phase5_archive": phase5_done,
+        "release_report": release_done,
+        "next_steps": next_steps,
+    }
+    typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+
+
 @app.command("version")
 def cmd_version() -> None:
     """Print package version."""

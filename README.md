@@ -161,6 +161,9 @@ uv run autopapers phase4 submit --bundle-dir ./data/submissions/submission-packa
 # uv run autopapers resume
 # uv run autopapers resume --profile user_profile.json
 
+# 查看当前流程进度与推荐下一步命令
+# uv run autopapers flow
+
 # Phase5 编排占位：从 confirmed proposal 一键产出 experiment/manuscript/submission bundle
 # uv run autopapers phase5 run --proposal ./data/proposals/proposal-confirmed.json
 # 若不想生成 tar.gz 归档，可显式关闭：--no-archive
