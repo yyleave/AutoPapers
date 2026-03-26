@@ -33,6 +33,26 @@ def test_phase3_run_writes_experiment_report(
     assert doc["proposal_title"] == "T"
 
 
+def test_phase3_evaluate_writes_summary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    report = tmp_path / "data" / "experiments" / "experiment-report.json"
+    report.parent.mkdir(parents=True, exist_ok=True)
+    report.write_text(
+        json.dumps({"status": "completed_stub", "proposal_title": "E"}),
+        encoding="utf-8",
+    )
+    r = CliRunner().invoke(app, ["phase3", "evaluate", "--report", str(report)])
+    assert r.exit_code == 0
+    out = Path(r.stdout.strip())
+    assert out.is_file()
+    doc = json.loads(out.read_text(encoding="utf-8"))
+    assert doc["status"] == "evaluated_stub"
+    assert doc["proposal_title"] == "E"
+
+
 def test_phase4_draft_and_bundle(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -115,6 +135,7 @@ def test_run_all_full_flow_includes_phase3_phase4_outputs(
     assert r.exit_code == 0, r.stdout + r.stderr
     out = json.loads(r.stdout)
     assert Path(out["experiment_report"]).is_file()
+    assert Path(out["evaluation_summary"]).is_file()
     assert Path(out["manuscript_draft"]).is_file()
     assert Path(out["submission_bundle"]).is_dir()
     assert Path(out["submission_archive"]).is_file()

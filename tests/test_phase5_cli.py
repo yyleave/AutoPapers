@@ -29,6 +29,7 @@ def test_phase5_run_writes_all_outputs(
     out = json.loads(r.stdout)
     assert out["ok"] is True
     assert Path(out["experiment_report"]).is_file()
+    assert Path(out["evaluation_summary"]).is_file()
     assert Path(out["manuscript_draft"]).is_file()
     bundle = Path(out["submission_bundle"])
     assert bundle.is_dir()

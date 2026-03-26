@@ -136,6 +136,7 @@ uv run autopapers proposal export -i ./data/proposals/proposal-draft.json
 
 # Phase 3/4 占位流程：执行报告 -> 论文草稿 -> 投稿打包目录
 uv run autopapers phase3 run --proposal ./data/proposals/proposal-confirmed.json
+uv run autopapers phase3 evaluate --report ./data/experiments/experiment-report.json
 uv run autopapers phase4 draft \
   --proposal ./data/proposals/proposal-confirmed.json \
   --experiment ./data/experiments/experiment-report.json

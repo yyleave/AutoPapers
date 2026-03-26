@@ -38,6 +38,7 @@ def build_status(
     draft = p.proposals_dir / "proposal-draft.json"
     confirmed = p.proposals_dir / "proposal-confirmed.json"
     experiment = p.data_dir / "experiments" / "experiment-report.json"
+    evaluation = p.data_dir / "experiments" / "evaluation-summary.json"
     manuscript = p.data_dir / "manuscripts" / "manuscript-draft.md"
     submission_bundle = p.data_dir / "submissions" / "submission-package"
     submission_archive = p.data_dir / "submissions" / "submission-package.tar.gz"
@@ -89,6 +90,7 @@ def build_status(
             "proposal_draft_exists": draft.is_file(),
             "proposal_confirmed_exists": confirmed.is_file(),
             "experiment_report_exists": experiment.is_file(),
+            "evaluation_summary_exists": evaluation.is_file(),
             "manuscript_draft_exists": manuscript.is_file(),
             "submission_bundle_exists": submission_bundle.is_dir(),
             "submission_archive_exists": submission_archive.is_file(),

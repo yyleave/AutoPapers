@@ -62,6 +62,7 @@ def test_release_runs_publish_and_verify(
     assert Path(rep["submission_archive"]).is_file()
     checks = rep["checksums"]
     assert "proposal-confirmed.json" in checks
+    assert "evaluation-summary.json" in checks
     assert "submission-package.tar.gz" in checks
     assert rep["verify"]["hashes"]["ok"] is True
     assert out["status"]["data"]["release_report_exists"] is True

@@ -423,6 +423,7 @@ def cmd_run_all(
     md_path.write_text(proposal_to_markdown(proposal), encoding="utf-8")
 
     experiment_path: Path | None = None
+    evaluation_summary_path: Path | None = None
     manuscript_path: Path | None = None
     bundle_dir: Path | None = None
     archive_path: Path | None = None
@@ -443,6 +444,25 @@ def cmd_run_all(
         }
         experiment_path.write_text(
             json.dumps(report, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        evaluation_summary_path = exp_dir / "evaluation-summary.json"
+        evaluation_summary_path.write_text(
+            json.dumps(
+                {
+                    "schema_version": "0.1",
+                    "status": "evaluated_stub",
+                    "from_report": str(experiment_path.resolve()),
+                    "proposal_title": proposal.get("title"),
+                    "quality_gate": {
+                        "reproducibility": "pass_stub",
+                        "completeness": "pass_stub",
+                    },
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
             encoding="utf-8",
         )
 
@@ -522,6 +542,9 @@ def cmd_run_all(
                 "proposal_markdown": str(md_path.resolve()),
                 "experiment_report": str(experiment_path.resolve())
                 if experiment_path
+                else None,
+                "evaluation_summary": str(evaluation_summary_path.resolve())
+                if evaluation_summary_path
                 else None,
                 "manuscript_draft": str(manuscript_path.resolve())
                 if manuscript_path
@@ -668,6 +691,7 @@ def cmd_release(
     md_path.write_text(proposal_to_markdown(proposal), encoding="utf-8")
 
     exp_out = paths.data_dir / "experiments" / "experiment-report.json"
+    eval_out = paths.data_dir / "experiments" / "evaluation-summary.json"
     ms_out = paths.data_dir / "manuscripts" / "manuscript-draft.md"
     bundle_out = paths.data_dir / "submissions" / "submission-package"
     archive_out = paths.data_dir / "submissions" / "submission-package.tar.gz"
@@ -682,6 +706,24 @@ def cmd_release(
                 "proposal_path": str(confirmed_path.resolve()),
                 "summary": "Stub execution finished; replace with real sandbox later.",
                 "metrics": {"primary_metric": "tbd", "value": None},
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    eval_out.write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "status": "evaluated_stub",
+                "from_report": str(exp_out.resolve()),
+                "proposal_title": proposal.get("title"),
+                "quality_gate": {
+                    "reproducibility": "pass_stub",
+                    "completeness": "pass_stub",
+                },
             },
             ensure_ascii=False,
             indent=2,
@@ -740,6 +782,7 @@ def cmd_release(
     checksums = {
         "proposal-confirmed.json": hashlib.sha256(confirmed_path.read_bytes()).hexdigest(),
         "experiment-report.json": hashlib.sha256(exp_out.read_bytes()).hexdigest(),
+        "evaluation-summary.json": hashlib.sha256(eval_out.read_bytes()).hexdigest(),
         "manuscript-draft.md": hashlib.sha256(ms_out.read_bytes()).hexdigest(),
         "manifest.json": hashlib.sha256((bundle_out / "manifest.json").read_bytes()).hexdigest(),
         "submission-package.tar.gz": hashlib.sha256(archive_out.read_bytes()).hexdigest(),
@@ -768,6 +811,7 @@ def cmd_release(
         "proposal_confirmed": str(confirmed_path.resolve()),
         "proposal_markdown": str(md_path.resolve()),
         "experiment_report": str(exp_out.resolve()),
+        "evaluation_summary": str(eval_out.resolve()),
         "manuscript_draft": str(ms_out.resolve()),
         "submission_bundle": str(bundle_out.resolve()),
         "submission_archive": str(archive_out.resolve()),
@@ -1694,6 +1738,51 @@ def phase3_run(
     typer.echo(str(out.resolve()))
 
 
+@phase3_app.command("evaluate")
+def phase3_evaluate(
+    report: Path = typer.Option(
+        Path("data/experiments/experiment-report.json"),
+        "--report",
+        "-r",
+        exists=True,
+        dir_okay=False,
+        help="Experiment report JSON path",
+    ),
+    output: Path | None = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Evaluation summary JSON path (default: data/experiments/evaluation-summary.json)",
+    ),
+) -> None:
+    """Phase3 stub: derive an evaluation summary from experiment report."""
+
+    try:
+        rep = json.loads(report.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        typer.echo(
+            json.dumps({"ok": False, "error": "invalid_json", "detail": str(e)}),
+            err=True,
+        )
+        raise typer.Exit(code=1) from e
+
+    paths = get_paths()
+    out = output or (paths.data_dir / "experiments" / "evaluation-summary.json")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    summary = {
+        "schema_version": "0.1",
+        "status": "evaluated_stub",
+        "from_report": str(report.resolve()),
+        "proposal_title": rep.get("proposal_title"),
+        "quality_gate": {
+            "reproducibility": "pass_stub",
+            "completeness": "pass_stub",
+        },
+    }
+    out.write_text(json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    typer.echo(str(out.resolve()))
+
+
 @phase4_app.command("draft")
 def phase4_draft(
     proposal: Path = typer.Option(
@@ -1897,6 +1986,7 @@ def phase5_run(
     paths = get_paths()
 
     exp_out = paths.data_dir / "experiments" / "experiment-report.json"
+    eval_out = paths.data_dir / "experiments" / "evaluation-summary.json"
     ms_out = paths.data_dir / "manuscripts" / "manuscript-draft.md"
     bundle_out = paths.data_dir / "submissions" / "submission-package"
     archive_out = paths.data_dir / "submissions" / "submission-package.tar.gz"
@@ -1945,6 +2035,24 @@ def phase5_run(
         "metrics": {"primary_metric": "tbd", "value": None},
     }
     exp_out.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    eval_out.write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "status": "evaluated_stub",
+                "from_report": str(exp_out.resolve()),
+                "proposal_title": raw.get("title"),
+                "quality_gate": {
+                    "reproducibility": "pass_stub",
+                    "completeness": "pass_stub",
+                },
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
     ms_out.parent.mkdir(parents=True, exist_ok=True)
     ms_out.write_text(
@@ -2005,6 +2113,7 @@ def phase5_run(
         "ok": True,
         "proposal_confirmed": str(proposal.resolve()),
         "experiment_report": str(exp_out.resolve()),
+        "evaluation_summary": str(eval_out.resolve()),
         "manuscript_draft": str(ms_out.resolve()),
         "submission_bundle": str(bundle_out.resolve()),
         "submission_archive": str(archive_out.resolve()) if archive else None,
