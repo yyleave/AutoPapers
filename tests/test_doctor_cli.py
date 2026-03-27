@@ -39,7 +39,7 @@ def test_doctor_cli_outputs_structure(tmp_path: Path, monkeypatch: pytest.Monkey
     assert isinstance(data["optional_features"]["ollama_cli"], bool)
     assert "paper_fetcher_cli" in data["optional_features"]
     assert isinstance(data["optional_features"]["paper_fetcher_cli"], bool)
-    assert data["optional_features"]["llm_supported_backends"] == ["ollama", "openai", "stub"]
+    assert data["optional_features"]["llm_supported_backends"] == ["openai", "ollama", "stub"]
     assert data["optional_features"]["llm_backend_valid"] is True
     assert data["optional_features"]["llm_backend_hint"] is None
 

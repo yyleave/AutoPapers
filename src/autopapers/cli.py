@@ -17,7 +17,7 @@ import typer
 
 from autopapers import __version__ as autopapers_version
 from autopapers.config import Paths, default_toml_path, get_paths, load_config
-from autopapers.env_check import build_doctor_payload
+from autopapers.env_check import build_doctor_payload, build_llm_backend_diagnostics
 from autopapers.logging_utils import setup_logging
 from autopapers.phase1.corpus_inspect import (
     load_corpus_snapshot_document,
@@ -1513,6 +1513,7 @@ def cmd_config() -> None:
     cfg = load_config()
     toml = default_toml_path()
     paths = get_paths()
+    llm_diag = build_llm_backend_diagnostics()
     typer.echo(
         json.dumps(
             {
@@ -1538,27 +1539,7 @@ def cmd_config() -> None:
                     "autopapers": shutil.which("autopapers") is not None,
                     "paper_fetcher_cli": shutil.which("paper-fetcher") is not None,
                 },
-                "llm": {
-                    "AUTOPAPERS_LLM_BACKEND": os.environ.get("AUTOPAPERS_LLM_BACKEND"),
-                    "effective_backend": (
-                        os.environ.get("AUTOPAPERS_LLM_BACKEND") or "openai"
-                    ).strip().lower(),
-                    "supported_backends": ["openai", "ollama", "stub"],
-                    "backend_valid": (
-                        (os.environ.get("AUTOPAPERS_LLM_BACKEND") or "openai").strip().lower()
-                        in {"openai", "ollama", "stub"}
-                    ),
-                    "backend_hint": (
-                        None
-                        if (os.environ.get("AUTOPAPERS_LLM_BACKEND") or "openai")
-                        .strip()
-                        .lower()
-                        in {"openai", "ollama", "stub"}
-                        else "Set AUTOPAPERS_LLM_BACKEND to openai|ollama|stub"
-                    ),
-                    "AUTOPAPERS_OPENAI_MODEL": os.environ.get("AUTOPAPERS_OPENAI_MODEL"),
-                    "AUTOPAPERS_OLLAMA_MODEL": os.environ.get("AUTOPAPERS_OLLAMA_MODEL"),
-                },
+                "llm": llm_diag,
             },
             ensure_ascii=False,
             indent=2,
