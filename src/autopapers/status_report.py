@@ -7,6 +7,7 @@ from typing import Any
 
 from autopapers import __version__
 from autopapers.config import AppConfig, Paths, default_toml_path, get_paths, load_config
+from autopapers.env_check import build_doctor_payload
 from autopapers.phase1.corpus_inspect import (
     load_corpus_snapshot_document,
     summarize_corpus_snapshot,
@@ -40,8 +41,15 @@ def build_status(
     experiment = p.data_dir / "experiments" / "experiment-report.json"
     evaluation = p.data_dir / "experiments" / "evaluation-summary.json"
     manuscript = p.data_dir / "manuscripts" / "manuscript-draft.md"
+    manuscript_pdf = p.data_dir / "manuscripts" / "manuscript-draft.pdf"
+    manuscript_bib = p.data_dir / "manuscripts" / "references.bib"
     submission_bundle = p.data_dir / "submissions" / "submission-package"
     submission_archive = p.data_dir / "submissions" / "submission-package.tar.gz"
+    bundle_pdf = submission_bundle / "manuscript-draft.pdf"
+    bundle_bib = submission_bundle / "references.bib"
+    bundle_artifacts_phase3 = submission_bundle / "artifacts" / "phase3"
+    phase3_exp_py = p.runs_dir / "phase3" / "experiment.py"
+    phase3_exp_spec = p.runs_dir / "phase3" / "experiment_spec.json"
     release_report = p.data_dir / "releases" / "release-report.json"
     release_verify_report = p.data_dir / "releases" / "release-verify-report.json"
     cfg_toml = default_toml_path()
@@ -62,6 +70,9 @@ def build_status(
         "app_version": __version__,
         "autopapers_repo_root_env_set": bool(os.environ.get("AUTOPAPERS_REPO_ROOT", "").strip()),
         "polite_mailto_configured": polite_mailto() is not None,
+        "aminer_api_key_configured": bool(
+            (os.environ.get("AMINER_API_KEY") or "").strip(),
+        ),
         "config": {
             "provider": c.provider,
             "log_level": c.log_level,
@@ -91,11 +102,19 @@ def build_status(
             "proposal_draft_exists": draft.is_file(),
             "proposal_confirmed_exists": confirmed.is_file(),
             "experiment_report_exists": experiment.is_file(),
+            "phase3_experiment_py_exists": phase3_exp_py.is_file(),
+            "phase3_experiment_spec_exists": phase3_exp_spec.is_file(),
             "evaluation_summary_exists": evaluation.is_file(),
             "manuscript_draft_exists": manuscript.is_file(),
+            "manuscript_pdf_exists": manuscript_pdf.is_file(),
+            "manuscript_references_bib_exists": manuscript_bib.is_file(),
             "submission_bundle_exists": submission_bundle.is_dir(),
+            "submission_bundle_pdf_exists": bundle_pdf.is_file(),
+            "submission_bundle_references_bib_exists": bundle_bib.is_file(),
+            "submission_bundle_artifacts_phase3_exists": bundle_artifacts_phase3.is_dir(),
             "submission_archive_exists": submission_archive.is_file(),
             "release_report_exists": release_report.is_file(),
             "release_verify_report_exists": release_verify_report.is_file(),
         },
+        "doctor": build_doctor_payload(paths=p),
     }

@@ -9,6 +9,29 @@ from typer.testing import CliRunner
 from autopapers.cli import app
 
 
+def test_proposal_generate_evaluator_writes_script(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    prof = tmp_path / "user.json"
+    assert CliRunner().invoke(app, ["profile", "init", "-o", str(prof)]).exit_code == 0
+    assert CliRunner().invoke(app, ["proposal", "draft", "--profile", str(prof)]).exit_code == 0
+    draft = tmp_path / "data" / "proposals" / "proposal-draft.json"
+    confirmed = tmp_path / "data" / "proposals" / "proposal-confirmed.json"
+    rc = CliRunner().invoke(
+        app,
+        ["proposal", "confirm", "-i", str(draft), "-o", str(confirmed)],
+    ).exit_code
+    assert rc == 0
+    r = CliRunner().invoke(app, ["proposal", "generate-evaluator", "--proposal", str(confirmed)])
+    assert r.exit_code == 0
+    out = Path(r.stdout.strip())
+    assert out.is_file()
+    txt = out.read_text(encoding="utf-8")
+    assert "coverage" in txt
+
+
 def test_proposal_draft_cli_rejects_invalid_profile(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -29,7 +29,7 @@ def test_phase3_run_writes_experiment_report(
     out = Path(r.stdout.strip())
     assert out.is_file()
     doc = json.loads(out.read_text(encoding="utf-8"))
-    assert doc["status"] == "completed_stub"
+    assert doc["status"] in {"planned", "executed"}
     assert doc["proposal_title"] == "T"
 
 
@@ -41,7 +41,7 @@ def test_phase3_evaluate_writes_summary(
     report = tmp_path / "data" / "experiments" / "experiment-report.json"
     report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(
-        json.dumps({"status": "completed_stub", "proposal_title": "E"}),
+        json.dumps({"status": "planned", "proposal_title": "E", "experiment_plan": {"steps": []}}),
         encoding="utf-8",
     )
     r = CliRunner().invoke(app, ["phase3", "evaluate", "--report", str(report)])
@@ -49,7 +49,7 @@ def test_phase3_evaluate_writes_summary(
     out = Path(r.stdout.strip())
     assert out.is_file()
     doc = json.loads(out.read_text(encoding="utf-8"))
-    assert doc["status"] == "evaluated_stub"
+    assert doc["status"] == "evaluated"
     assert doc["proposal_title"] == "E"
 
 
@@ -66,13 +66,44 @@ def test_phase4_draft_and_bundle(
     exp.write_text(
         json.dumps(
             {
-                "schema_version": "0.1",
-                "status": "completed_stub",
-                "metrics": {"primary_metric": "tbd", "value": None},
+                "schema_version": "0.2",
+                "status": "planned",
+                "experiment_plan": {
+                    "steps": [{"name": "S", "detail": "D"}],
+                },
+                "metrics": {"primary_metric": "to_be_defined", "value": None},
+                "artifacts": {
+                    "dir": str((tmp_path / "my-artifacts").resolve()),
+                },
             }
         ),
         encoding="utf-8",
     )
+    art_dir = tmp_path / "my-artifacts"
+    art_dir.mkdir(parents=True, exist_ok=True)
+    (art_dir / "metrics.json").write_text("{}", encoding="utf-8")
+    kg = tmp_path / "data" / "kg"
+    kg.mkdir(parents=True, exist_ok=True)
+    (kg / "corpus-snapshot.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "nodes": [
+                    {
+                        "id": "paper:test:1",
+                        "type": "Paper",
+                        "label": "Corpus Paper",
+                        "source": "test",
+                        "external_id": "1",
+                    }
+                ],
+                "edges": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    eva = tmp_path / "data" / "experiments" / "evaluation-summary.json"
+    eva.write_text(json.dumps({"status": "evaluated", "proposal_title": "T"}), encoding="utf-8")
 
     r1 = CliRunner().invoke(
         app,
@@ -81,7 +112,10 @@ def test_phase4_draft_and_bundle(
     assert r1.exit_code == 0
     md = Path(r1.stdout.strip())
     assert md.is_file()
-    assert "# T" in md.read_text(encoding="utf-8")
+    md_text = md.read_text(encoding="utf-8")
+    assert "# T" in md_text
+    assert "## Traceability" in md_text
+    md.with_suffix(".pdf").write_bytes(b"%PDF-1.4\n%mock\n")
 
     r2 = CliRunner().invoke(
         app,
@@ -92,16 +126,35 @@ def test_phase4_draft_and_bundle(
             str(proposal),
             "--experiment",
             str(exp),
+            "--evaluation",
+            str(eva),
             "--manuscript",
             str(md),
+            "--include-artifacts",
+            "--include-pdf",
+            "--include-bib",
         ],
     )
     assert r2.exit_code == 0
     bundle = Path(r2.stdout.strip())
     assert (bundle / "proposal-confirmed.json").is_file()
     assert (bundle / "experiment-report.json").is_file()
+    assert (bundle / "evaluation-summary.json").is_file()
     assert (bundle / "manuscript-draft.md").is_file()
+    assert (bundle / "manuscript-draft.pdf").is_file()
     assert (bundle / "manifest.json").is_file()
+    man = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
+    assert man.get("schema_version") == "0.2"
+    assert man.get("autopapers_version")
+    assert isinstance(man.get("generated_at"), str) and man["generated_at"].endswith("Z")
+    assert man.get("optional_present") == [
+        "artifacts/phase3",
+        "manuscript-draft.pdf",
+        "references.bib",
+    ]
+    assert (bundle / "artifacts" / "phase3" / "metrics.json").is_file()
+    assert (bundle / "references.bib").is_file()
+    assert "Corpus Paper" in (bundle / "references.bib").read_text(encoding="utf-8")
 
 
 def test_run_all_full_flow_includes_phase3_phase4_outputs(
@@ -135,6 +188,8 @@ def test_run_all_full_flow_includes_phase3_phase4_outputs(
     assert r.exit_code == 0, r.stdout + r.stderr
     out = json.loads(r.stdout)
     assert Path(out["experiment_report"]).is_file()
+    exp_doc = json.loads(Path(out["experiment_report"]).read_text(encoding="utf-8"))
+    assert exp_doc.get("execution", {}).get("mode") == "local_experiment_py"
     assert Path(out["evaluation_summary"]).is_file()
     assert Path(out["manuscript_draft"]).is_file()
     assert Path(out["submission_bundle"]).is_dir()

@@ -7,6 +7,7 @@ import pytest
 from pypdf import PdfWriter
 from typer.testing import CliRunner
 
+from autopapers import __version__ as autopapers_version
 from autopapers.cli import app
 
 
@@ -57,8 +58,34 @@ def test_release_verify_ok(
     assert out.exit_code == 0
     payload = json.loads(out.stdout)
     assert payload["ok"] is True
-    assert Path(payload["release_verify_report"]).is_file()
+    vrep = Path(payload["release_verify_report"])
+    assert vrep.is_file()
+    vr_doc = json.loads(vrep.read_text(encoding="utf-8"))
+    assert vr_doc["schema_version"] == "0.2"
+    assert vr_doc["autopapers_version"] == autopapers_version
+    assert isinstance(vr_doc.get("generated_at"), str) and vr_doc["generated_at"].endswith("Z")
     assert payload["status"]["data"]["release_verify_report_exists"] is True
+
+
+def test_release_verify_ok_without_archive(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    pdf = tmp_path / "z.pdf"
+    _tiny_pdf(pdf)
+    prof = tmp_path / "user.json"
+    _profile(prof, str(pdf.resolve()))
+    rel = CliRunner().invoke(
+        app,
+        ["release", "--profile", str(prof), "--no-archive"],
+        env={"AUTOPAPERS_PROVIDER": "local_pdf"},
+    )
+    assert rel.exit_code == 0
+    out = CliRunner().invoke(app, ["release-verify"])
+    assert out.exit_code == 0
+    payload = json.loads(out.stdout)
+    assert payload["ok"] is True
 
 
 def test_release_verify_detects_tamper(

@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from autopapers.config import AppConfig, get_paths
 from autopapers.status_report import build_status
 
@@ -31,6 +33,7 @@ def test_build_status_counts(tmp_path: Path) -> None:
     assert r["app_version"]
     assert r["autopapers_repo_root_env_set"] is False
     assert "polite_mailto_configured" in r
+    assert r["aminer_api_key_configured"] is False
     assert r["config"]["provider"] == "crossref"
     assert r["data"]["metadata_json"] == 1
     assert r["data"]["profiles_json"] == 1
@@ -40,6 +43,19 @@ def test_build_status_counts(tmp_path: Path) -> None:
     assert "contact_email" in r["config"]
     assert r["corpus_snapshot"]["present"] is False
     assert r["corpus_snapshot"]["summary"] is None
+    assert r["doctor"]["ok"] is True
+    assert isinstance(r["doctor"]["optional_features"]["llm_backend"], str)
+
+
+def test_build_status_aminer_key_detected(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AMINER_API_KEY", "secret-not-printed")
+    paths = get_paths(repo_root=tmp_path)
+    r = build_status(paths=paths, cfg=AppConfig(provider="arxiv", log_level="INFO"))
+    assert r["aminer_api_key_configured"] is True
+    assert "secret" not in json.dumps(r)
 
 
 def test_build_status_includes_corpus_summary_when_present(tmp_path: Path) -> None:
@@ -104,6 +120,8 @@ def test_build_status_phase3_phase4_flags(tmp_path: Path) -> None:
 
     r0 = build_status(paths=paths)
     assert r0["data"]["experiment_report_exists"] is False
+    assert r0["data"]["phase3_experiment_py_exists"] is False
+    assert r0["data"]["phase3_experiment_spec_exists"] is False
     assert r0["data"]["evaluation_summary_exists"] is False
     assert r0["data"]["manuscript_draft_exists"] is False
     assert r0["data"]["submission_bundle_exists"] is False
@@ -125,8 +143,15 @@ def test_build_status_phase3_phase4_flags(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
+    phase3 = paths.runs_dir / "phase3"
+    phase3.mkdir(parents=True, exist_ok=True)
+    (phase3 / "experiment.py").write_text("# x\n", encoding="utf-8")
+    (phase3 / "experiment_spec.json").write_text("{}", encoding="utf-8")
+
     r1 = build_status(paths=paths)
     assert r1["data"]["experiment_report_exists"] is True
+    assert r1["data"]["phase3_experiment_py_exists"] is True
+    assert r1["data"]["phase3_experiment_spec_exists"] is True
     assert r1["data"]["evaluation_summary_exists"] is True
     assert r1["data"]["manuscript_draft_exists"] is True
     assert r1["data"]["submission_bundle_exists"] is True

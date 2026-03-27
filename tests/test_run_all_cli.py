@@ -65,3 +65,32 @@ def test_run_all_local_pdf_chain(
     assert Path(out["proposal_markdown"]).is_file()
     assert out["status"]["data"]["proposal_confirmed_exists"] is True
 
+
+def test_run_all_unknown_provider_exits_nonzero(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    pdf = tmp_path / "demo.pdf"
+    _tiny_pdf(pdf)
+    profile = tmp_path / "user.json"
+    _minimal_profile(profile, keyword=str(pdf.resolve()))
+    r = CliRunner().invoke(
+        app,
+        [
+            "run-all",
+            "--profile",
+            str(profile),
+            "--title",
+            "T",
+            "--limit",
+            "1",
+            "--provider",
+            "not_a_provider",
+        ],
+        env={"AUTOPAPERS_PROVIDER": "local_pdf"},
+    )
+    assert r.exit_code == 1
+    err = json.loads(r.stderr.strip())
+    assert err["error"] == "unknown_provider"
+

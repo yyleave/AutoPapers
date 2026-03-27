@@ -420,3 +420,55 @@ def test_papers_parse_batch_continues_after_bad_pdf(
     assert summary["parsed"] == 1
     assert len(summary["errors"]) == 1
     assert "bad.pdf" in summary["errors"][0]
+
+
+def test_papers_download_requires_title_or_doi(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    r = CliRunner().invoke(app, ["papers", "download"])
+    assert r.exit_code != 0
+
+
+@patch("api.pdf_downloader.PDFDownloader.download")
+def test_papers_download_cli_mocked_writes_fetch_metadata(
+    mock_download: MagicMock,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    out_pdf = tmp_path / "data" / "papers" / "pdfs" / "downloaded.pdf"
+    out_pdf.parent.mkdir(parents=True, exist_ok=True)
+    out_pdf.write_bytes(b"%PDF-auto")
+
+    from api.pdf_downloader import DownloadResult  # noqa: PLC0415
+
+    mock_download.return_value = DownloadResult(
+        success=True, filepath=str(out_pdf), source="arXiv"
+    )
+
+    r = CliRunner().invoke(
+        app,
+        [
+            "papers",
+            "download",
+            "--title",
+            "Some Paper",
+            "--doi",
+            "10.1000/xyz",
+            "--authors",
+            "A, B",
+        ],
+    )
+    assert r.exit_code == 0
+    first_line = r.stdout.strip().split("\n", 1)[0]
+    assert first_line == str(out_pdf.resolve())
+    assert "Wrote metadata" in (r.stderr or "")
+    metas = list((tmp_path / "data" / "papers" / "metadata").glob("fetch-*.json"))
+    assert len(metas) == 1
+    doc = json.loads(metas[0].read_text(encoding="utf-8"))
+    assert doc["type"] == "fetch"
+    assert doc["source"] == "pdf_downloader"
+    assert "10.1000" in doc["id"]
+    mock_download.assert_called_once()

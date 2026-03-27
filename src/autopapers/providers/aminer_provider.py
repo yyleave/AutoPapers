@@ -17,12 +17,14 @@ class AminerProvider:
     """
 
     name: str = "aminer"
+    #: When set, passed to :class:`AMinerClient` instead of relying only on env.
+    api_token: str | None = None
 
     def search(self, *, query: str, limit: int = 5) -> list[PaperRef]:
         ensure_legacy_api_on_path()
         from api.aminer_client import AMinerClient  # noqa: PLC0415
 
-        client = AMinerClient()
+        client = AMinerClient(self.api_token)
         papers = client.paper_search(query, page=0, size=limit)
         if papers:
             paper_ids = [p.id for p in papers]
@@ -38,6 +40,11 @@ class AminerProvider:
                     id=p.id,
                     title=p.title,
                     pdf_url=pdf,
+                    authors=tuple(p.authors) if p.authors else None,
+                    year=p.year,
+                    doi=p.doi,
+                    venue=p.venue,
+                    url=p.url,
                 )
             )
         return refs

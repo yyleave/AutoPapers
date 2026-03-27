@@ -43,6 +43,109 @@ def test_resume_from_confirmed_proposal(
     assert Path(out["submission_archive"]).is_file()
 
 
+def test_resume_from_confirmed_proposal_no_archive(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    confirmed = tmp_path / "data" / "proposals" / "proposal-confirmed.json"
+    _confirmed(confirmed)
+    r = CliRunner().invoke(app, ["resume", "--no-archive"])
+    assert r.exit_code == 0, r.stdout + r.stderr
+    out = json.loads(r.stdout)
+    assert out["ok"] is True
+    assert out["submission_archive"] is None
+
+
+def test_resume_fallback_passes_provider_to_release(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("AUTOPAPERS_REPO_ROOT", str(tmp_path))
+    monkeypatch.delenv("AUTOPAPERS_PROVIDER", raising=False)
+    pdf = tmp_path / "r.pdf"
+    _tiny_pdf(pdf)
+    prof = tmp_path / "user.json"
+    prof.write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "user": {"languages": ["en"]},
+                "background": {"domains": [], "skills": [], "constraints": []},
+                "hardware": {"device": "other"},
+                "research_intent": {
+                    "problem_statements": [],
+                    "keywords": [str(pdf.resolve())],
+                    "non_goals": [],
+                    "risk_tolerance": "medium",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    r = CliRunner().invoke(
+        app,
+        ["resume", "--profile", str(prof), "--provider", "local_pdf"],
+    )
+    assert r.exit_code == 0, r.stdout + r.stderr
+    out = json.loads(r.stdout)
+    assert out["ok"] is True
+    report_path = Path(out["release_report"])
+    rep = json.loads(report_path.read_text(encoding="utf-8"))
+    assert rep["provider"] == "local_pdf"
+
+
+def test_resume_fallback_forwards_title_limit_parse_to_release(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("AUTOPAPERS_REPO_ROOT", str(tmp_path))
+    monkeypatch.delenv("AUTOPAPERS_PROVIDER", raising=False)
+    pdf = tmp_path / "r.pdf"
+    _tiny_pdf(pdf)
+    prof = tmp_path / "user.json"
+    prof.write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "user": {"languages": ["en"]},
+                "background": {"domains": [], "skills": [], "constraints": []},
+                "hardware": {"device": "other"},
+                "research_intent": {
+                    "problem_statements": [],
+                    "keywords": [str(pdf.resolve())],
+                    "non_goals": [],
+                    "risk_tolerance": "medium",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    r = CliRunner().invoke(
+        app,
+        [
+            "resume",
+            "--profile",
+            str(prof),
+            "--provider",
+            "local_pdf",
+            "--title",
+            "Resume Title From CLI",
+            "--limit",
+            "1",
+            "--parse-max-pages",
+            "1",
+        ],
+    )
+    assert r.exit_code == 0, r.stdout + r.stderr
+    prop = json.loads(
+        (tmp_path / "data" / "proposals" / "proposal-confirmed.json").read_text(encoding="utf-8")
+    )
+    assert prop["title"] == "Resume Title From CLI"
+
+
 def test_resume_falls_back_to_release_with_profile(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -1017,3 +1017,81 @@ def test_phase1_parse_fetched_writes_parsed(
     assert parsed.is_file()
     man = tmp_path / "data" / "papers" / "parsed" / "doc.manifest.json"
     assert man.is_file()
+
+
+def test_phase1_dry_run_provider_cli_overrides_config(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    prof = tmp_path / "p.json"
+    prof.write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "user": {"languages": ["en"]},
+                "background": {"domains": [], "skills": [], "constraints": []},
+                "hardware": {"device": "other"},
+                "research_intent": {
+                    "problem_statements": [],
+                    "keywords": ["alpha"],
+                    "non_goals": [],
+                    "risk_tolerance": "medium",
+                },
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    r = CliRunner().invoke(
+        app,
+        [
+            "phase1",
+            "run",
+            "--profile",
+            str(prof),
+            "--dry-run",
+            "--provider",
+            "aminer",
+        ],
+        env={"AUTOPAPERS_PROVIDER": "arxiv"},
+    )
+    assert r.exit_code == 0
+    out = json.loads(r.stdout)
+    assert out["provider"] == "aminer"
+    assert out["provider_config_default"] == "arxiv"
+    assert out["provider_cli_overridden"] is True
+
+
+def test_phase1_run_unknown_provider_exits_nonzero(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    prof = tmp_path / "p.json"
+    prof.write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1",
+                "user": {"languages": ["en"]},
+                "background": {"domains": [], "skills": [], "constraints": []},
+                "hardware": {"device": "other"},
+                "research_intent": {
+                    "problem_statements": [],
+                    "keywords": ["x"],
+                    "non_goals": [],
+                    "risk_tolerance": "medium",
+                },
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    r = CliRunner().invoke(
+        app,
+        ["phase1", "run", "--profile", str(prof), "--dry-run", "--provider", "not_a_provider"],
+    )
+    assert r.exit_code == 1
+    err = json.loads(r.stderr.strip())
+    assert err["error"] == "unknown_provider"
+    assert "not_a_provider" == err["provider"]

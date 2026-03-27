@@ -13,6 +13,8 @@ dependencies = [
 
 [project.scripts]
 autopapers = "autopapers.cli:app"
+# Legacy AMiner search/download CLI (see src/paper_fetcher.py); prefer ``autopapers papers …``.
+paper-fetcher = "paper_fetcher:main"
 
 [dependency-groups]
 dev = [

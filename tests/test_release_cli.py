@@ -7,6 +7,7 @@ import pytest
 from pypdf import PdfWriter
 from typer.testing import CliRunner
 
+from autopapers import __version__ as autopapers_version
 from autopapers.cli import app
 
 
@@ -58,6 +59,10 @@ def test_release_runs_publish_and_verify(
     report = Path(out["release_report"])
     assert report.is_file()
     rep = json.loads(report.read_text(encoding="utf-8"))
+    assert rep["schema_version"] == "0.2"
+    assert rep["autopapers_version"] == autopapers_version
+    assert isinstance(rep.get("generated_at"), str) and rep["generated_at"].endswith("Z")
+    assert rep["proposal_title"] == "Release Demo"
     assert rep["ok"] is True
     assert Path(rep["submission_archive"]).is_file()
     checks = rep["checksums"]
@@ -66,6 +71,40 @@ def test_release_runs_publish_and_verify(
     assert "submission-package.tar.gz" in checks
     assert rep["verify"]["hashes"]["ok"] is True
     assert out["status"]["data"]["release_report_exists"] is True
+
+
+def test_release_no_archive_omits_tar_and_checksum(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    pdf = tmp_path / "rel-no-arch.pdf"
+    _tiny_pdf(pdf)
+    prof = tmp_path / "user.json"
+    _profile(prof, str(pdf.resolve()))
+    r = CliRunner().invoke(
+        app,
+        [
+            "release",
+            "--profile",
+            str(prof),
+            "--title",
+            "No Tar",
+            "--limit",
+            "1",
+            "--no-archive",
+        ],
+        env={"AUTOPAPERS_PROVIDER": "local_pdf"},
+    )
+    assert r.exit_code == 0, r.stdout + r.stderr
+    out = json.loads(r.stdout)
+    report = Path(out["release_report"])
+    rep = json.loads(report.read_text(encoding="utf-8"))
+    assert rep["schema_version"] == "0.2"
+    assert rep["proposal_title"] == "No Tar"
+    assert rep["submission_archive"] is None
+    assert "submission-package.tar.gz" not in rep["checksums"]
+    assert out["verify"]["hashes"]["ok"] is True
 
 
 def test_release_no_verify_payload(

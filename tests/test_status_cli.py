@@ -19,6 +19,9 @@ def test_status_cli_prints_json_summary(tmp_path: Path, monkeypatch: pytest.Monk
     assert data["config"]["provider"]
     assert "data" in data
     assert "corpus_snapshot" in data
+    assert "doctor" in data
+    assert data["doctor"]["ok"] is True
+    assert "optional_features" in data["doctor"]
     assert data["autopapers_repo_root_env_set"] is True
     assert data["paths"]["repo_root"] == str(tmp_path.resolve())
 

@@ -31,3 +31,22 @@ def test_config_command_outputs_json() -> None:
     assert "default_toml_path" in data
     assert "data_repo_root" in data
     assert "env_override" in data
+    assert "entrypoints_on_path" in data
+    ep = data["entrypoints_on_path"]
+    assert isinstance(ep["autopapers"], bool)
+    assert isinstance(ep["paper_fetcher_cli"], bool)
+    assert data["llm"]["effective_backend"] in {"openai", "ollama", "stub"}
+    assert data["llm"]["supported_backends"] == ["openai", "ollama", "stub"]
+    assert data["llm"]["backend_valid"] is True
+    assert data["llm"]["backend_hint"] is None
+    assert "AUTOPAPERS_LLM_BACKEND" in data["llm"]
+
+
+def test_config_llm_invalid_backend_hint(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AUTOPAPERS_LLM_BACKEND", "bad-backend")
+    r = CliRunner().invoke(app, ["config"])
+    assert r.exit_code == 0
+    data = json.loads(r.stdout)
+    assert data["llm"]["effective_backend"] == "bad-backend"
+    assert data["llm"]["backend_valid"] is False
+    assert data["llm"]["backend_hint"] == "Set AUTOPAPERS_LLM_BACKEND to openai|ollama|stub"

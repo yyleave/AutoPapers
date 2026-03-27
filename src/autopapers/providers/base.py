@@ -11,6 +11,12 @@ class PaperRef:
     id: str
     title: str | None = None
     pdf_url: str | None = None
+    #: Optional metadata (AMiner and other rich providers may populate these)
+    authors: tuple[str, ...] | None = None
+    year: int | None = None
+    doi: str | None = None
+    venue: str | None = None
+    url: str | None = None
 
 
 class Provider(Protocol):

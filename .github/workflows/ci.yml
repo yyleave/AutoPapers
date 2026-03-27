@@ -3,6 +3,13 @@ name: ci
 on:
   push:
   pull_request:
+  workflow_dispatch:
+    inputs:
+      run_network_smoke:
+        description: "Run provider network smoke checks"
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   test:
@@ -20,8 +27,23 @@ jobs:
         run: pip install uv
       - name: Sync
         run: uv sync
-      - name: Ruff
-        run: uv run ruff check .
-      - name: Pytest
-        run: uv run pytest -q
+      - name: Release Check (offline)
+        run: bash scripts/release_check.sh
+
+  network-smoke:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_network_smoke }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install uv
+        run: pip install uv
+      - name: Sync
+        run: uv sync
+      - name: Network Smoke
+        env:
+          AMINER_API_KEY: ${{ secrets.AMINER_API_KEY }}
+        run: bash scripts/release_check.sh --skip-offline-tests --skip-demo-tests --with-network-smoke
 

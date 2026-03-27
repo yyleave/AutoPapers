@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -135,3 +136,15 @@ def test_title_requires_non_empty_list() -> None:
     assert _title({"title": []}) is None
     assert _title({"title": "plain"}) is None
     assert _title({"title": ["Only"]}) == "Only"
+
+
+@pytest.mark.network
+def test_crossref_search_network_smoke() -> None:
+    if os.environ.get("AUTOPAPERS_NETWORK_SMOKE", "").strip().lower() not in {
+        "1",
+        "true",
+        "yes",
+    }:
+        pytest.skip("Set AUTOPAPERS_NETWORK_SMOKE=1 to run provider network smoke tests")
+    refs = CrossrefProvider().search(query="transformer", limit=1)
+    assert isinstance(refs, list)
